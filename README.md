@@ -59,8 +59,8 @@ app/src/main/java/com/example/
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/your-username/zvid.cmd.git
-   cd zvid
+   git clone https://github.com/Zead-zoher/Zvid-.git
+   cd Zvid-
    ```
 
 2. **Build the Debug APK**:
