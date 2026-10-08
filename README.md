@@ -114,6 +114,24 @@ If you just want to install and use the app immediately, you can download the la
 
 ---
 
+## ⚖️ Disclaimer / إخلاء المسؤولية
+
+### English
+
+- **No Advertisements**: This application is 100% free, open-source, and does not contain any advertisements, tracking, or premium paywalls.
+- **Media Information**: All movie, TV show, and cast metadata (including titles, descriptions, and posters) are retrieved dynamically using the official TMDB (The Movie Database) API via the API key provided by the user.
+- **Video Streams**: This application does not host, upload, or store any media/video files on its servers. It only provides a client interface to play embed links from external streaming providers (specifically [VidSrc Win](https://vidsrc.win/)). Any copyright inquiries or complaints regarding video files should be directed to the third-party providers hosting the actual content.
+
+---
+
+### العربية (إخلاء المسؤولية)
+
+- **بدون أي إعلانات**: هذا التطبيق مجاني بالكامل 100% ومفتوح المصدر، ولا يحتوي على أي إعلانات أو أدوات تتبع أو ميزات مدفوعة.
+- **معلومات الأفلام والمسلسلات**: يتم جلب جميع بيانات الأفلام والمسلسلات وصور الممثلين تلقائياً باستخدام مفتاح API الرسمي لموقع [TMDB](https://www.themoviedb.org/) والذي يقوم المستخدم بإدخاله بنفسه في إعدادات التطبيق.
+- **مصادر البث وتضمين الفيديو**: التطبيق لا يستضيف ولا يرفع ولا يخزن أي ملفات فيديو أو أفلام على خوادمه الخاصة. التطبيق يعمل فقط كواجهة مستخدم لتشغيل الروابط والمشغلات الخارجية المتاحة للعامة (تحديداً من موقع السيرفرات الخارجي [vidsrc.win](https://vidsrc.win/)). أي استفسارات أو شكاوى متعلقة بحقوق الطبع والنشر لملفات الفيديو يجب توجيهها مباشرة إلى السيرفرات الخارجية المستضيفة للمحتوى.
+
+---
+
 ## 📜 License
 
 This project is open source and available under the [MIT License](https://opensource.org/licenses/MIT).
