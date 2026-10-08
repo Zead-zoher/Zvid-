@@ -1,5 +1,7 @@
 # 🎬 Zvid - Modern Movies & TV Series Android Application
 
+[![Download APK](https://img.shields.io/badge/Download-APK_v1.0.0-green?style=for-the-badge&logo=android)](https://github.com/Zead-zoher/Zvid-/releases/download/v1.0.0/Zvid_v1.0.0.apk)
+
 **Zvid** is a feature-rich, modern Android media streaming and exploration application built with **Kotlin** and **Jetpack Compose**. It leverages the TMDB API to provide seamless browsing of movies, TV series, actor filmographies, production studio catalogs, and embedded streaming playback.
 
 ---
@@ -48,14 +50,21 @@ app/src/main/java/com/example/
 
 ---
 
-## 🚀 How to Build & Run
+## 🚀 How to Install & Run
 
-### Prerequisites
+### 📥 Direct Download
+If you just want to install and use the app immediately, you can download the latest pre-compiled debug APK from the link below:
+
+👉 **[Download Zvid_v1.0.0.apk](https://github.com/Zead-zoher/Zvid-/releases/download/v1.0.0/Zvid_v1.0.0.apk)**
+
+---
+
+### Building from Source
+
+#### Prerequisites
 - **Android Studio**: Ladybug / Jellyfish or newer
 - **JDK**: JDK 17 or higher
 - **Android SDK**: Min SDK 24 (Android 7.0), Target SDK 34/35
-
-### Building from Source
 
 1. **Clone the repository**:
    ```bash
@@ -88,6 +97,12 @@ app/src/main/java/com/example/
 ## 📄 Arabic Summary / ملخص المشروع
 
 **Zvid** هو تطبيق أندرويد حديث لمشاهدة وتصفح الأفلام والمسلسلات مع واجهة أنيقة باللون الداكن (Dark Mode) مبني باستخدام **Kotlin** و **Jetpack Compose**.
+
+📥 **تحميل مباشر للتطبيق**:
+يمكنك تحميل التطبيق وتثبيته مباشرة على هاتفك دون الحاجة للبناء من المصدر من خلال هذا الرابط:
+👉 **[تحميل تطبيق Zvid_v1.0.0.apk](https://github.com/Zead-zoher/Zvid-/releases/download/v1.0.0/Zvid_v1.0.0.apk)**
+
+---
 
 ### أهم المميزات:
 - 🎬 **تصفح شامل للأفلام والمسلسلات**: تصنيفات متنوعة مع دعم فلترة المناطق (مثل EU & Lat).
