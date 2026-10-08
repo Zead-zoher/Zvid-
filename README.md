@@ -1,137 +1,133 @@
-# 🎬 Zvid - Modern Movies & TV Series Android Application
+# Zvid - Movies & TV Series Explorer
 
-[![Download APK](https://img.shields.io/badge/Download-APK_v1.0.0-green?style=for-the-badge&logo=android)](https://github.com/Zead-zoher/Zvid-/releases/download/v1.0.0/Zvid_v1.0.0.apk)
+🌐 **Language / اللغة:** [العربية (Arabic)](README.ar.md) | **[Download APK](https://github.com/Zead-zoher/Zvid-/releases/download/v1.0.0/Zvid_v1.0.0.apk)**
 
-**Zvid** is a feature-rich, modern Android media streaming and exploration application built with **Kotlin** and **Jetpack Compose**. It leverages the TMDB API to provide seamless browsing of movies, TV series, actor filmographies, production studio catalogs, and embedded streaming playback.
+**License:** MIT | **Min SDK:** Android 7.0 (API 24) | **Language:** Kotlin | **Ads:** None | **Streaming Server:** vidsrc.win
 
----
-
-## 🌟 Features
-
-- 🎬 **Movies & TV Shows Catalog**: Explore popular, top-rated, and trending movies and TV series with rich category filtering (including regional collections like EU & Lat).
-- 🏢 **Production Companies Catalog**: Browse full media libraries from major production studios and companies without limit restrictions.
-- 🎭 **Actor & Cast Profiles**: Deep dive into actors' bios, full filmographies, and media appearances with smooth backstack navigation.
-- ⏯️ **Integrated Media Player**: Custom AndroidX Media3 / ExoPlayer integration supporting custom stream selection, quality overlays, and playback control interface.
-- 🔖 **Saved Watchlist & Playback History**: Keep track of bookmarked movies/shows and pick up where you left off with recent history.
-- 📺 **Web Video Caster Support**: Stream video links directly to your Smart TV or casting devices with seamless Web Video Caster integration.
-- 🎨 **Material 3 Dark UI**: Modern, sleek dark theme with fluid animations, adaptive layouts, and responsive components.
+Zvid is an elegant, ad-free Android media exploration and streaming client built with Kotlin and Jetpack Compose. It allows users to browse movies, TV shows, production studio catalogs, and actors, with seamless embedded playback powered by AndroidX Media3/ExoPlayer and external cast support.
 
 ---
 
-## 🛠️ Tech Stack & Architecture
-
-- **Language**: [Kotlin](https://kotlinlang.org/)
-- **UI Framework**: [Jetpack Compose](https://developer.android.com/jetpack/compose) with Material 3 Design
-- **Architecture Pattern**: MVVM (Model-View-ViewModel) with Unidirectional Data Flow (StateFlow)
-- **Networking**: Retrofit 2 & OkHttp 3 with JSON parsing
-- **Media Playback**: AndroidX Media3 / ExoPlayer
-- **Image Loading**: Coil Compose
-- **Async & Reactive**: Kotlin Coroutines & Flow
+## Table of Contents
+1. [Features](#features)
+2. [Architecture & Data Flow](#architecture--data-flow)
+3. [Directory Structure](#directory-structure)
+4. [Prerequisites & Build](#prerequisites--build)
+5. [TMDB API Key Setup](#tmdb-api-key-setup)
+6. [Roadmap](#roadmap)
+7. [Contributing](#contributing)
+8. [Known Issues](#known-issues)
+9. [Disclaimer](#disclaimer)
+10. [License](#license)
 
 ---
 
-## 📁 Project Structure
+## Features
+
+Zvid offers a high-performance experience with real-time metadata exploration and integrated playback features. Below is the implementation status of key features:
+
+| Feature | Description | Status |
+| :--- | :--- | :--- |
+| **Discover / Browse Screen** | Detailed browsing of trending, popular, and top-rated movies & TV shows with advanced filters (Genre, Release Year, Language). | Completed |
+| **Media Detail Screen** | Comprehensive views of media containing synopses, user ratings, release dates, runtime, studio portfolios, cast member list, and season/episode selectors. | Completed |
+| **Actor Profiles** | In-depth actor biographies, personal details (birthplace, birthday, popularity), and scrollable filmographies with smooth backstack navigation. | Completed |
+| **Studio Catalogs** | Exploration of works belonging to major production companies (e.g., Marvel, Disney) with release-year filters. | Completed |
+| **Embedded ExoPlayer Playback** | Dynamic stream resolution selector (4K, 1080p, 720p, 480p) playing public web streams via an integrated AndroidX Media3/ExoPlayer with speed control. | Completed |
+| **Web Video Caster** | Direct casting of active stream links to external Smart TVs and casting devices using the Web Video Caster app. | Completed |
+| **Watchlist & History** | Local data persistence for personal bookmarked watchlists and recent playback history. | Completed |
+| **Search Functionality** | Direct real-time search of movies, TV shows, and production companies across the TMDB network. | Completed |
+| **Subtitles Engine** | Automated subtitle search and local subtitle rendering. | Under Development |
+| **Offline Download Manager** | Local caching and offline video downloads. | Under Development |
+
+---
+
+## Architecture & Data Flow
+
+Zvid is built using modern Android development practices, adhering to the MVVM (Model-View-ViewModel) architectural pattern coupled with Unidirectional Data Flow (UDF). This architecture decouples data fetching and business logic from the UI layer, facilitating easy maintainability and testing.
+
+### Data Flow Process
+1. **Repository & Remote Sources**: Raw network data is fetched from the TMDB API using Retrofit. The Repository acts as a single source of truth, converting network data Transfer Objects (DTOs) into clean, presentation-ready Domain Models.
+2. **ViewModel & StateFlow**: The ViewModel manages state by making asynchronous calls to the Repository within Kotlin Coroutines. The results are transformed and exposed as read-only, lifecycle-aware `StateFlow` states to prevent unnecessary state mutations.
+3. **Compose UI**: Jetpack Compose UI screens collect the exposed `StateFlow` states safely using `collectAsStateWithLifecycle()`. Any UI interaction is emitted back to the ViewModel as an event, keeping data flow completely unidirectional.
+
+---
+
+## Directory Structure
 
 ```
 app/src/main/java/com/example/
-├── data/              # Data models, local storage, remote API services, repositories
-├── player/            # Video player implementation & controls
-├── ui/                # Jetpack Compose UI layer
-│   ├── components/    # Reusable UI widgets & cards
-│   ├── modals/        # Details, cast profiles, resolution selectors
-│   ├── player/        # Custom player composables
-│   ├── remote/        # Remote control interface
-│   ├── screens/       # Main app screens (Movies, Series, Companies, Saved, Recent)
-│   └── theme/         # Color palettes, Typography, and Shapes
-├── util/              # Helper utilities and extensions
-├── viewmodel/         # Screen ViewModels managing state & business logic
-└── MainActivity.kt    # Root activity & navigation entry point
+├── data/              # Remote API services, local repositories, & API Key management
+├── player/            # ExoPlayer / Media3 setup, controllers, and caster integrations
+├── ui/                # UI Layer
+│   ├── components/    # Reusable widgets (cards, grids, sliders)
+│   ├── modals/        # Resolution selectors, cast info bottom sheets
+│   ├── screens/       # Views (Movies, Series, Companies, Saved, History)
+│   └── theme/         # Material 3 typography, colors, and shapes
+└── viewmodel/         # ViewModels managing state & reactive StateFlows
 ```
 
 ---
 
-## 🚀 How to Install & Run
+## Prerequisites & Build
 
-### 📥 Direct Download
-If you just want to install and use the app immediately, you can download the latest pre-compiled debug APK from the link below:
+**Prerequisites:** JDK 17 | Android SDK API 24+ (Min SDK 24, Target SDK 34/35) | Android Studio (Ladybug or newer)
 
-👉 **[Download Zvid_v1.0.0.apk](https://github.com/Zead-zoher/Zvid-/releases/download/v1.0.0/Zvid_v1.0.0.apk)**
+To build the project locally, run the following commands in your terminal:
 
----
+```bash
+# Clone the repository
+git clone https://github.com/Zead-zoher/Zvid-.git
+cd Zvid-
 
-### Building from Source
-
-#### Prerequisites
-- **Android Studio**: Ladybug / Jellyfish or newer
-- **JDK**: JDK 17 or higher
-- **Android SDK**: Min SDK 24 (Android 7.0), Target SDK 34/35
-
-1. **Clone the repository**:
-   ```bash
-   git clone https://github.com/Zead-zoher/Zvid-.git
-   cd Zvid-
-   ```
-
-2. **Build the Debug APK**:
-   ```bash
-   gradle assembleDebug
-   ```
-
-3. **Configure TMDB API Key / إعداد مفتاح API الخاص بـ TMDB**:
-   The app runs instantly using a pre-configured demo key. For unlimited personal usage, obtain your own TMDB API Key:
-   - **How to get the API Key (كيفية الحصول على المفتاح)**:
-     1. Create a free account on [The Movie Database (TMDB)](https://www.themoviedb.org/).
-     2. Go to your **Account Settings** (اضغط على صورة حسابك ثم Settings).
-     3. Select the **API** tab from the left sidebar.
-     4. Click on **Create** under the API Key request section and choose **Developer** (مطور).
-     5. Accept terms and fill in a brief application description (e.g., "Zvid Streaming Android App").
-     6. Copy your **API Key (v3 auth)**.
-   - **How to use it in Zvid (كيفية استخدام المفتاح في التطبيق)**:
-     - Open Zvid app on your device.
-     - Tap on the **Settings Gear Icon** (أيقونة الترس/الإعدادات) in the top-right header to open the settings drawer.
-     - Paste your key in the TMDB API Key field and tap **Save Key / حفظ المفتاح**.
-     - Alternatively, you can edit `com.example.data.local.ApiKeyStore.kt` and replace `DEFAULT_DEMO_KEY` with your key for a permanent default value.
+# Build the Debug APK using Gradle wrapper
+./gradlew assembleDebug # macOS/Linux
+gradlew.bat assembleDebug # Windows
+```
 
 ---
 
-## 📄 Arabic Summary / ملخص المشروع
+## TMDB API Key Setup
 
-**Zvid** هو تطبيق أندرويد حديث لمشاهدة وتصفح الأفلام والمسلسلات مع واجهة أنيقة باللون الداكن (Dark Mode) مبني باستخدام **Kotlin** و **Jetpack Compose**.
+Zvid runs immediately with a temporary key. To use your own TMDB API key:
 
-📥 **تحميل مباشر للتطبيق**:
-يمكنك تحميل التطبيق وتثبيته مباشرة على هاتفك دون الحاجة للبناء من المصدر من خلال هذا الرابط:
-👉 **[تحميل تطبيق Zvid_v1.0.0.apk](https://github.com/Zead-zoher/Zvid-/releases/download/v1.0.0/Zvid_v1.0.0.apk)**
-
----
-
-### أهم المميزات:
-- 🎬 **تصفح شامل للأفلام والمسلسلات**: تصنيفات متنوعة مع دعم فلترة المناطق (مثل EU & Lat).
-- 🏢 **عرض أعمال شركات الإنتاج**: تصفح كل أفلام ومسلسلات الشركات بدون قيود.
-- 🎭 **صفحات الممثلين وفريق العمل**: استعراض الأعمال الكاملة للممثلين والتنقل السلس بين الصفحات.
-- ⏯️ **مشغل فيديو متكامل**: مشغل مدمج تدعم تغيير الجودة والسيرفرات والتحكم في التشغيل.
-- 📺 **دعم Web Video Caster**: إمكانية إرسال وبث روابط الفيديو مباشرة إلى التلفزيون الذكي عبر تطبيق Web Video Caster بسلاسة.
-- 🔖 **قائمة الحفظ والسجل**: حفظ الأعمال المفضلة وسجل المشاهدات الأخيرة.
+1. Register for a free account at [The Movie Database (TMDB)](https://www.themoviedb.org/).
+2. Navigate to your **Account Settings** -> **API** in the left sidebar menu.
+3. Request an API Key as a "Developer" and accept terms.
+4. Copy the **API Key (v3 auth)**.
+5. In the Zvid app, tap the **Settings Gear Icon** (top-right), paste your key, and click **Save Key**.
 
 ---
 
-## ⚖️ Disclaimer / إخلاء المسؤولية
+## Roadmap
 
-### English
-
-- **No Advertisements**: This application is 100% free, open-source, and does not contain any advertisements, tracking, or premium paywalls.
-- **Media Information**: All movie, TV show, and cast metadata (including titles, descriptions, and posters) are retrieved dynamically using the official TMDB (The Movie Database) API via the API key provided by the user.
-- **Video Streams**: This application does not host, upload, or store any media/video files on its servers. It only provides a client interface to play embed links from external streaming providers (specifically [VidSrc Win](https://vidsrc.win/)). Any copyright inquiries or complaints regarding video files should be directed to the third-party providers hosting the actual content.
-
----
-
-### العربية (إخلاء المسؤولية)
-
-- **بدون أي إعلانات**: هذا التطبيق مجاني بالكامل 100% ومفتوح المصدر، ولا يحتوي على أي إعلانات أو أدوات تتبع أو ميزات مدفوعة.
-- **معلومات الأفلام والمسلسلات**: يتم جلب جميع بيانات الأفلام والمسلسلات وصور الممثلين تلقائياً باستخدام مفتاح API الرسمي لموقع [TMDB](https://www.themoviedb.org/) والذي يقوم المستخدم بإدخاله بنفسه في إعدادات التطبيق.
-- **مصادر البث وتضمين الفيديو**: التطبيق لا يستضيف ولا يرفع ولا يخزن أي ملفات فيديو أو أفلام على خوادمه الخاصة. التطبيق يعمل فقط كواجهة مستخدم لتشغيل الروابط والمشغلات الخارجية المتاحة للعامة (تحديداً من موقع السيرفرات الخارجي [vidsrc.win](https://vidsrc.win/)). أي استفسارات أو شكاوى متعلقة بحقوق الطبع والنشر لملفات الفيديو يجب توجيهها مباشرة إلى السيرفرات الخارجية المستضيفة للمحتوى.
+Upcoming features and improvements planned for Zvid:
+- [ ] Add support for multiple subtitle tracks (SRT/VTT).
+- [ ] Optimize Picture-in-Picture (PiP) mode for TV layouts.
+- [ ] Implement custom user-created folders and custom media lists.
+- [ ] Enable offline media downloads.
 
 ---
 
-## 📜 License
+## Contributing
 
-This project is open source and available under the [MIT License](https://opensource.org/licenses/MIT).
+Contributions are welcome! If you'd like to improve Zvid, feel free to fork the repository, make your changes on a separate feature branch, and submit a Pull Request.
+
+---
+
+## Known Issues
+
+- Stream load speed and playback stability depend directly on the external streaming server's bandwidth and uptime.
+
+---
+
+## Disclaimer
+
+- **Third-Party Providers**: This application does not host, upload, or store any video files on its servers. All video streams are resolved dynamically from third-party public web servers, specifically [vidsrc.win](https://vidsrc.win/). The end-user is solely responsible for any content accessed through this client.
+- **Metadata & TMDB API**: All metadata, poster images, actor bio details, and studio information are fetched from the official TMDB API. This client is not officially endorsed or certified by TMDB.
+- **No Ads**: Zvid contains no advertisements, trackers, or monetization features. It is built as a non-commercial, open-source educational project.
+
+---
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](https://opensource.org/licenses/MIT) file for details.

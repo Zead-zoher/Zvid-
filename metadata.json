@@ -1,6 +1,6 @@
 {
   "name": "Zvid",
-  "description": "Zvid - Modern dark-themed movie and series streaming application with TMDB BYOK integration, watchlists, and playback history.",
+  "description": "An elegant, ad-free Android app for exploring movies and TV shows using TMDB with direct high-quality streaming support.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
