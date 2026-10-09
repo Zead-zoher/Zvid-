@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Button
@@ -92,6 +93,8 @@ fun MediaDetailModal(
     onPlayEpisode: (tvDetail: TmdbTvDetail, seasonNumber: Int, episode: TmdbEpisode) -> Unit,
     onToggleWatchlistMovie: (TmdbMovieDetail) -> Unit,
     onToggleWatchlistTv: (TmdbTvDetail) -> Unit,
+    onReportMovie: (TmdbMovieDetail) -> Unit = {},
+    onReportTv: (TmdbTvDetail) -> Unit = {},
     onCompanyClick: (companyId: Int, companyName: String) -> Unit = { _, _ -> },
     onPersonClick: (personId: Int) -> Unit = {},
     onDismiss: () -> Unit
@@ -140,6 +143,7 @@ fun MediaDetailModal(
                     isSaved = isSaved,
                     onPlayClick = { onPlayMovie(movieDetail) },
                     onWatchlistToggle = { onToggleWatchlistMovie(movieDetail) },
+                    onReportClick = { onReportMovie(movieDetail) },
                     onCompanyClick = { id, name ->
                         onDismiss()
                         onCompanyClick(id, name)
@@ -163,6 +167,7 @@ fun MediaDetailModal(
                     onSeasonSelected = { num -> onSeasonSelected(tvDetail.id, num) },
                     onPlayEpisode = { ep -> onPlayEpisode(tvDetail, selectedSeasonNumber, ep) },
                     onToggleWatchlist = { onToggleWatchlistTv(tvDetail) },
+                    onReportClick = { onReportTv(tvDetail) },
                     onCompanyClick = { id, name ->
                         onDismiss()
                         onCompanyClick(id, name)
@@ -187,6 +192,7 @@ fun MovieDetailContent(
     isSaved: Boolean,
     onPlayClick: () -> Unit,
     onWatchlistToggle: () -> Unit,
+    onReportClick: () -> Unit = {},
     onCompanyClick: (Int, String) -> Unit = { _, _ -> },
     onPersonClick: (Int) -> Unit = {},
     onShowMoreCast: (List<com.example.data.model.TmdbCastMember>) -> Unit = {},
@@ -230,22 +236,42 @@ fun MovieDetailContent(
                         )
                 )
 
-                // Close Button top-right
-                IconButton(
-                    onClick = onClose,
+                // Actions top-right (Report & Close)
+                Row(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(16.dp)
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .background(Color.Black.copy(alpha = 0.6f))
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = "Close",
-                        tint = Color.White,
-                        modifier = Modifier.size(20.dp)
-                    )
+                    IconButton(
+                        onClick = onReportClick,
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(Color.Black.copy(alpha = 0.6f))
+                            .testTag("report_movie_btn")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Flag,
+                            contentDescription = "Report",
+                            tint = Color.White,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                    IconButton(
+                        onClick = onClose,
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(Color.Black.copy(alpha = 0.6f))
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Close",
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                 }
             }
         }
@@ -568,6 +594,7 @@ fun TvDetailContent(
     onSeasonSelected: (Int) -> Unit,
     onPlayEpisode: (TmdbEpisode) -> Unit,
     onToggleWatchlist: () -> Unit,
+    onReportClick: () -> Unit = {},
     onCompanyClick: (Int, String) -> Unit = { _, _ -> },
     onPersonClick: (Int) -> Unit = {},
     onShowMoreCast: (List<com.example.data.model.TmdbCastMember>) -> Unit = {},
@@ -612,21 +639,42 @@ fun TvDetailContent(
                         )
                 )
 
-                IconButton(
-                    onClick = onClose,
+                // Actions top-right (Report & Close)
+                Row(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(16.dp)
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .background(Color.Black.copy(alpha = 0.6f))
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = "Close",
-                        tint = Color.White,
-                        modifier = Modifier.size(20.dp)
-                    )
+                    IconButton(
+                        onClick = onReportClick,
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(Color.Black.copy(alpha = 0.6f))
+                            .testTag("report_tv_btn")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Flag,
+                            contentDescription = "Report",
+                            tint = Color.White,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                    IconButton(
+                        onClick = onClose,
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(Color.Black.copy(alpha = 0.6f))
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Close",
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                 }
             }
         }

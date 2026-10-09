@@ -59,6 +59,7 @@ fun PeopleDialogModal(
     onPlayMovie: (TmdbMovie) -> Unit,
     onToggleWatchlistMovie: (TmdbMovie) -> Unit,
     onToggleWatchlistTv: (TmdbTv) -> Unit,
+    onReportPerson: (TmdbPersonDetail) -> Unit = {},
     onDismiss: () -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -87,6 +88,7 @@ fun PeopleDialogModal(
                     onPlayMovie = onPlayMovie,
                     onToggleWatchlistMovie = onToggleWatchlistMovie,
                     onToggleWatchlistTv = onToggleWatchlistTv,
+                    onReport = { onReportPerson(selectedPerson) },
                     onClose = onDismiss
                 )
             } else {
@@ -299,6 +301,7 @@ fun PersonDetailView(
     onPlayMovie: (TmdbMovie) -> Unit,
     onToggleWatchlistMovie: (TmdbMovie) -> Unit,
     onToggleWatchlistTv: (TmdbTv) -> Unit,
+    onReport: () -> Unit = {},
     onClose: () -> Unit
 ) {
     var isMoviesTab by remember { mutableStateOf(true) } // Requirement: Switch between movies and series, movies first!
@@ -334,19 +337,40 @@ fun PersonDetailView(
                     )
                 }
 
-                IconButton(
-                    onClick = onClose,
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .background(NetflixCardElevated)
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = "Close",
-                        tint = Color.White,
-                        modifier = Modifier.size(18.dp)
-                    )
+                    IconButton(
+                        onClick = onReport,
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(NetflixCardElevated)
+                            .testTag("report_person_btn")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Flag,
+                            contentDescription = "Report Person",
+                            tint = Color.White,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+
+                    IconButton(
+                        onClick = onClose,
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(NetflixCardElevated)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Close",
+                            tint = Color.White,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
                 }
             }
 

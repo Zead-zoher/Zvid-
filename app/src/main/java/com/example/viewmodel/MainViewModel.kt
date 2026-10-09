@@ -3,6 +3,8 @@ package com.example.viewmodel
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.data.filter.ContentFilter
+import com.example.data.filter.RemoteBlocklist
 import com.example.data.local.ApiKeyStore
 import com.example.data.local.RecentHistoryEntity
 import com.example.data.local.SavedCompanyEntity
@@ -18,6 +20,7 @@ import com.example.data.model.TmdbPersonDetail
 import com.example.data.model.TmdbSeasonDetail
 import com.example.data.model.TmdbTv
 import com.example.data.model.TmdbTvDetail
+import com.example.data.report.ReportStore
 import com.example.data.repository.MediaRepository
 import com.example.ui.screens.CompanySortOption
 import com.example.ui.screens.SortDirection
@@ -71,14 +74,43 @@ enum class PlaybackDestination {
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     val apiKeyStore = ApiKeyStore(application)
+    val reportStore = ReportStore(application)
+    val remoteBlocklist = RemoteBlocklist(application)
     val searchHistoryStore = com.example.data.local.SearchHistoryStore(application)
     private val database = ZvidDatabase.getDatabase(application)
     val repository = MediaRepository(
         apiKeyStore = apiKeyStore,
         watchlistDao = database.watchlistDao(),
         recentHistoryDao = database.recentHistoryDao(),
-        savedCompanyDao = database.savedCompanyDao()
+        savedCompanyDao = database.savedCompanyDao(),
+        reportStore = reportStore
     )
+
+    private val _isDetailUnavailable = MutableStateFlow(false)
+    val isDetailUnavailable: StateFlow<Boolean> = _isDetailUnavailable.asStateFlow()
+
+    fun dismissUnavailable() {
+        _isDetailUnavailable.value = false
+    }
+
+    fun onItemReported(id: Int) {
+        if (_activeMovieDetail.value?.id == id) {
+            closeDetailModal()
+        }
+        if (_activeTvDetail.value?.id == id) {
+            closeDetailModal()
+        }
+        if (_selectedCompany.value?.id == id) {
+            closeCompanyDetail()
+        }
+        if (_selectedPerson.value?.id == id) {
+            closePersonDetail()
+        }
+        loadMovies()
+        loadSeries()
+        loadCompaniesForRegion()
+        loadPopularPeople()
+    }
 
     private val _playbackDestination = MutableStateFlow(PlaybackDestination.NONE)
     val playbackDestination: StateFlow<PlaybackDestination> = _playbackDestination.asStateFlow()
@@ -348,6 +380,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun selectCompany(company: ProductionCompanyInfo) {
         closeDetailModal()
         closePeopleDialog()
+        if (ContentFilter.isBlockedCompany(company) || reportStore.isReported(company.id)) {
+            _selectedCompany.value = null
+            _isDetailUnavailable.value = true
+            return
+        }
         _selectedCompany.value = company
         _selectedCompanySortOption.value = CompanySortOption.POPULARITY
         _selectedCompanySortDirection.value = SortDirection.ASC
@@ -357,6 +394,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun openCompanyById(companyId: Int, companyName: String = "") {
         closeDetailModal()
         closePeopleDialog()
+        if (ContentFilter.isBlockedCompany(companyId, companyName) || reportStore.isReported(companyId)) {
+            _selectedCompany.value = null
+            _isDetailUnavailable.value = true
+            return
+        }
         _currentTab.value = AppTab.COMPANIES
         viewModelScope.launch {
             _isCompanyLoading.value = true
@@ -365,8 +407,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 id = companyId,
                 name = companyName.ifBlank { "Production Company" }
             )
-            _selectedCompany.value = info
-            loadCompanyContent(companyId, CompanySortOption.POPULARITY, SortDirection.ASC)
+            if (ContentFilter.isBlockedCompany(info) || reportStore.isReported(info.id)) {
+                _selectedCompany.value = null
+                _isDetailUnavailable.value = true
+            } else {
+                _selectedCompany.value = info
+                loadCompanyContent(companyId, CompanySortOption.POPULARITY, SortDirection.ASC)
+            }
         }
     }
 
@@ -487,11 +534,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun selectPerson(personId: Int) {
+        if (reportStore.isReported(personId)) {
+            _selectedPerson.value = null
+            _isDetailUnavailable.value = true
+            return
+        }
         _isPeopleDialogOpen.value = true
         viewModelScope.launch {
             _isLoadingPerson.value = true
             val res = repository.getPersonDetails(personId, _selectedContentRegion.value)
-            _selectedPerson.value = res.getOrNull()
+            val detail = res.getOrNull()
+            if (detail != null && (ContentFilter.isBlockedPerson(detail) || reportStore.isReported(detail.id))) {
+                _selectedPerson.value = null
+                _isPeopleDialogOpen.value = false
+                _isDetailUnavailable.value = true
+            } else {
+                _selectedPerson.value = detail
+            }
             _isLoadingPerson.value = false
         }
     }
@@ -530,6 +589,33 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     )
 
     init {
+        viewModelScope.launch {
+            remoteBlocklist.initialize()
+        }
+        viewModelScope.launch {
+            ContentFilter.blocklist.collect {
+                val currentMovie = _activeMovieDetail.value
+                if (currentMovie != null && ContentFilter.isBlockedMovie(currentMovie)) {
+                    _activeMovieDetail.value = null
+                    _isDetailUnavailable.value = true
+                }
+                val currentTv = _activeTvDetail.value
+                if (currentTv != null && ContentFilter.isBlockedTv(currentTv)) {
+                    _activeTvDetail.value = null
+                    _isDetailUnavailable.value = true
+                }
+                val currentCompany = _selectedCompany.value
+                if (currentCompany != null && ContentFilter.isBlockedCompany(currentCompany)) {
+                    _selectedCompany.value = null
+                    _isDetailUnavailable.value = true
+                }
+                val currentPerson = _selectedPerson.value
+                if (currentPerson != null && ContentFilter.isBlockedPerson(currentPerson)) {
+                    _selectedPerson.value = null
+                    _isDetailUnavailable.value = true
+                }
+            }
+        }
         loadMovies()
         loadSeries()
         loadCompaniesForRegion()
@@ -817,12 +903,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     // === DETAILS MODAL ACTIONS ===
     fun openMovieDetail(movieId: Int) {
+        if (reportStore.isReported(movieId)) {
+            _activeMovieDetail.value = null
+            _isDetailUnavailable.value = true
+            return
+        }
         viewModelScope.launch {
             _isLoadingDetail.value = true
             _activeTvDetail.value = null
             val res = repository.getMovieDetails(movieId, _selectedContentRegion.value)
             if (res.isSuccess) {
-                _activeMovieDetail.value = res.getOrNull()
+                val detail = res.getOrNull()
+                if (detail != null && (ContentFilter.isBlockedMovie(detail) || reportStore.isReported(detail.id))) {
+                    _activeMovieDetail.value = null
+                    _isDetailUnavailable.value = true
+                } else {
+                    _activeMovieDetail.value = detail
+                }
             } else {
                 _userMessage.emit("Could not fetch movie details")
             }
@@ -831,6 +928,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun openTvDetail(tvId: Int) {
+        if (reportStore.isReported(tvId)) {
+            _activeTvDetail.value = null
+            _isDetailUnavailable.value = true
+            return
+        }
         viewModelScope.launch {
             _isLoadingDetail.value = true
             _activeMovieDetail.value = null
@@ -839,10 +941,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val res = repository.getTvDetails(tvId, _selectedContentRegion.value)
             if (res.isSuccess) {
                 val tvDetail = res.getOrNull()
-                _activeTvDetail.value = tvDetail
-                if (tvDetail != null && !tvDetail.seasons.isNullOrEmpty()) {
-                    val firstSeason = tvDetail.seasons.firstOrNull { it.seasonNumber > 0 } ?: tvDetail.seasons.first()
-                    selectSeason(tvId, firstSeason.seasonNumber)
+                if (tvDetail != null && (ContentFilter.isBlockedTv(tvDetail) || reportStore.isReported(tvDetail.id))) {
+                    _activeTvDetail.value = null
+                    _isDetailUnavailable.value = true
+                } else {
+                    _activeTvDetail.value = tvDetail
+                    if (tvDetail != null && !tvDetail.seasons.isNullOrEmpty()) {
+                        val firstSeason = tvDetail.seasons.firstOrNull { it.seasonNumber > 0 } ?: tvDetail.seasons.first()
+                        selectSeason(tvId, firstSeason.seasonNumber)
+                    }
                 }
             } else {
                 _userMessage.emit("Could not fetch series details")

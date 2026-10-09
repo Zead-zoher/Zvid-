@@ -80,6 +80,7 @@ fun CompaniesScreen(
     onToggleWatchlistMovie: (TmdbMovie) -> Unit,
     onToggleWatchlistTv: (TmdbTv) -> Unit,
     onSortChanged: (CompanySortOption, SortDirection) -> Unit,
+    onReportCompany: (ProductionCompanyInfo) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     if (selectedCompany != null) {
@@ -96,6 +97,7 @@ fun CompaniesScreen(
             selectedRegion = selectedRegion,
             onBack = onCloseCompany,
             onToggleSave = { onToggleSaveCompany(selectedCompany) },
+            onReportCompany = { onReportCompany(selectedCompany) },
             onMovieClick = onMovieClick,
             onTvClick = onTvClick,
             onPlayMovie = onPlayMovie,
@@ -320,6 +322,7 @@ fun CompanyDetailScreen(
     selectedRegion: ContentRegion = ContentRegion.GLOBAL,
     onBack: () -> Unit,
     onToggleSave: () -> Unit,
+    onReportCompany: () -> Unit = {},
     onMovieClick: (Int) -> Unit,
     onTvClick: (Int) -> Unit,
     onPlayMovie: (TmdbMovie) -> Unit,
@@ -370,18 +373,38 @@ fun CompanyDetailScreen(
                         )
                     }
 
-                    IconButton(
-                        onClick = onToggleSave,
-                        modifier = Modifier
-                            .size(38.dp)
-                            .clip(CircleShape)
-                            .background(NetflixCardElevated)
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            imageVector = if (isSaved) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
-                            contentDescription = "Save Company",
-                            tint = if (isSaved) NetflixRed else Color.White
-                        )
+                        IconButton(
+                            onClick = onReportCompany,
+                            modifier = Modifier
+                                .size(38.dp)
+                                .clip(CircleShape)
+                                .background(NetflixCardElevated)
+                                .testTag("report_company_btn")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Flag,
+                                contentDescription = "Report Company",
+                                tint = Color.White
+                            )
+                        }
+
+                        IconButton(
+                            onClick = onToggleSave,
+                            modifier = Modifier
+                                .size(38.dp)
+                                .clip(CircleShape)
+                                .background(NetflixCardElevated)
+                        ) {
+                            Icon(
+                                imageVector = if (isSaved) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                                contentDescription = "Save Company",
+                                tint = if (isSaved) NetflixRed else Color.White
+                            )
+                        }
                     }
                 }
 

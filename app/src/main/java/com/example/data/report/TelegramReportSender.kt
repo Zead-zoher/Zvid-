@@ -1,0 +1,77 @@
+package com.example.data.report
+
+import com.example.BuildConfig
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import okhttp3.FormBody
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import java.util.concurrent.TimeUnit
+
+class TelegramReportSender(
+    private val reportStore: ReportStore
+) : ReportSender {
+
+    // Clean client without any logging interceptor to strictly prevent logging secrets or URLs
+    private val client = OkHttpClient.Builder()
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(15, TimeUnit.SECONDS)
+        .build()
+
+    override suspend fun sendReport(item: ReportItem, appVersion: String): ReportResult = withContext(Dispatchers.IO) {
+        // Abuse protection check
+        val (canReport, abuseReason) = reportStore.canSubmitReport(item.id)
+        if (!canReport) {
+            return@withContext if (reportStore.isReported(item.id)) {
+                ReportResult.AlreadyReported(abuseReason ?: "Already reported")
+            } else {
+                ReportResult.RateLimited(abuseReason ?: "Report rate limit reached")
+            }
+        }
+
+        val token = BuildConfig.TELEGRAM_BOT_TOKEN.trim()
+        val chatId = BuildConfig.TELEGRAM_CHAT_ID.trim()
+
+        if (token.isBlank() || chatId.isBlank()) {
+            return@withContext ReportResult.Error("Reporting is not configured")
+        }
+
+        val reasonText = if (item.reason.trim().isBlank()) "none" else item.reason.trim().take(300)
+        val linkUrl = "https://www.themoviedb.org/${item.type.tmdbPath}/${item.id}"
+
+        val messageText = buildString {
+            appendLine("New report")
+            appendLine("Type: ${item.type.key}")
+            appendLine("ID: ${item.id}")
+            appendLine("Title: ${item.title}")
+            appendLine("Link: $linkUrl")
+            appendLine("Reason: $reasonText")
+            append("App version: $appVersion")
+        }
+
+        try {
+            val endpoint = "https://api.telegram.org/bot$token/sendMessage"
+            val formBody = FormBody.Builder()
+                .add("chat_id", chatId)
+                .add("text", messageText)
+                .build()
+
+            val request = Request.Builder()
+                .url(endpoint)
+                .post(formBody)
+                .build()
+
+            val response = client.newCall(request).execute()
+            response.use {
+                if (it.isSuccessful) {
+                    reportStore.recordSuccessfulReport(item.id)
+                    ReportResult.Success
+                } else {
+                    ReportResult.Error("Failed to deliver report (HTTP ${it.code})")
+                }
+            }
+        } catch (e: Exception) {
+            ReportResult.Error("Connection error while sending report")
+        }
+    }
+}

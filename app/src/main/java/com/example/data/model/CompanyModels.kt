@@ -9,7 +9,8 @@ data class ProductionCompanyInfo(
     val description: String = "",
     val logoPath: String? = null,
     val originCountry: String = "",
-    val regions: List<ContentRegion> = listOf(ContentRegion.GLOBAL)
+    val regions: List<ContentRegion> = listOf(ContentRegion.GLOBAL),
+    val adult: Boolean = false
 ) {
     val fullLogoUrl: String? get() = logoPath?.let {
         if (it.startsWith("http")) it else "https://image.tmdb.org/t/p/w500$it"

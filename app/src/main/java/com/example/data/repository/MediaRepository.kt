@@ -1,5 +1,6 @@
 package com.example.data.repository
 
+import com.example.data.filter.ContentFilter
 import com.example.data.local.ApiKeyStore
 import com.example.data.local.RecentHistoryDao
 import com.example.data.local.RecentHistoryEntity
@@ -11,6 +12,7 @@ import com.example.data.model.CompaniesCatalog
 import com.example.data.model.ProductionCompanyInfo
 import com.example.data.model.TmdbMovie
 import com.example.data.model.TmdbMovieDetail
+import com.example.data.model.TmdbPagedResponse
 import com.example.data.model.TmdbPerson
 import com.example.data.model.TmdbPersonDetail
 import com.example.data.model.TmdbProductionCompany
@@ -18,21 +20,74 @@ import com.example.data.model.TmdbSeasonDetail
 import com.example.data.model.TmdbTv
 import com.example.data.model.TmdbTvDetail
 import com.example.data.remote.TmdbApiClient
+import com.example.data.report.ReportStore
 import com.example.util.ArabicSearchHelper
 import com.example.viewmodel.ContentRegion
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.withContext
 
 class MediaRepository(
     private val apiKeyStore: ApiKeyStore,
     private val watchlistDao: WatchlistDao,
     private val recentHistoryDao: RecentHistoryDao,
-    private val savedCompanyDao: SavedCompanyDao
+    private val savedCompanyDao: SavedCompanyDao,
+    private val reportStore: ReportStore
 ) {
     private val api get() = TmdbApiClient.getApi(apiKeyStore)
+
+    // Helper to filter movies with both built-in content filter and user-reported IDs
+    fun filterMoviesWithReports(list: List<TmdbMovie>): List<TmdbMovie> {
+        return ContentFilter.filterMovies(list).filter { !reportStore.isReported(it.id) }
+    }
+
+    // Helper to filter TV with both built-in content filter and user-reported IDs
+    fun filterTvWithReports(list: List<TmdbTv>): List<TmdbTv> {
+        return ContentFilter.filterTv(list).filter { !reportStore.isReported(it.id) }
+    }
+
+    // Helper to filter people with both built-in content filter and user-reported IDs
+    fun filterPeopleWithReports(list: List<TmdbPerson>): List<TmdbPerson> {
+        return ContentFilter.filterPeople(list).filter { !reportStore.isReported(it.id) }
+    }
+
+    // Helper to filter companies with both built-in content filter and user-reported IDs
+    fun filterCompaniesWithReports(list: List<ProductionCompanyInfo>): List<ProductionCompanyInfo> {
+        return ContentFilter.filterCompanies(list).filter { !reportStore.isReported(it.id) }
+    }
+
+    // Pagination helper: if filtered list has fewer than 10 items and more pages exist,
+    // automatically fetch next pages (max 3 extra pages) so screens never look empty.
+    private suspend fun <T> fetchWithFilter(
+        initialPage: Int,
+        fetchPage: suspend (page: Int) -> TmdbPagedResponse<T>?,
+        filterFn: (List<T>) -> List<T>
+    ): List<T> {
+        val accumulated = mutableListOf<T>()
+        var currentPage = initialPage
+        var extraPagesRemaining = 3
+
+        while (true) {
+            val response = try {
+                fetchPage(currentPage)
+            } catch (_: Exception) {
+                null
+            } ?: break
+
+            val filtered = filterFn(response.results)
+            accumulated.addAll(filtered)
+
+            if (accumulated.size >= 10 || currentPage >= response.totalPages || extraPagesRemaining <= 0) {
+                break
+            }
+            currentPage++
+            extraPagesRemaining--
+        }
+        return accumulated
+    }
 
     // === TMDB Key Validation ===
     suspend fun validateApiKey(keyToTest: String? = null): Result<Boolean> = withContext(Dispatchers.IO) {
@@ -62,19 +117,29 @@ class MediaRepository(
         region: ContentRegion = ContentRegion.GLOBAL
     ): Result<List<TmdbMovie>> = withContext(Dispatchers.IO) {
         try {
-            val response = if (region == ContentRegion.GLOBAL) {
-                api.getTrendingMovies(timeWindow, page, language = region.languageCode)
-            } else if (region.originalLanguages != null) {
-                api.discoverMovies(
-                    withOriginalLanguage = region.originalLanguages,
-                    language = region.languageCode,
-                    page = page,
-                    sortBy = "popularity.desc"
-                )
-            } else {
-                api.getTrendingMovies(timeWindow, page, language = region.languageCode)
-            }
-            Result.success(response.results)
+            val filterParams = ContentFilter.discoverParams()
+            val list = fetchWithFilter(
+                initialPage = page,
+                fetchPage = { p ->
+                    if (region == ContentRegion.GLOBAL) {
+                        api.getTrendingMovies(timeWindow, p, language = region.languageCode)
+                    } else if (region.originalLanguages != null) {
+                        api.discoverMovies(
+                            withOriginalLanguage = region.originalLanguages,
+                            language = region.languageCode,
+                            page = p,
+                            sortBy = "popularity.desc",
+                            withoutKeywords = filterParams.withoutKeywords,
+                            withoutCompanies = filterParams.withoutCompanies,
+                            includeAdult = false
+                        )
+                    } else {
+                        api.getTrendingMovies(timeWindow, p, language = region.languageCode)
+                    }
+                },
+                filterFn = { filterMoviesWithReports(it) }
+            )
+            Result.success(list)
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -85,19 +150,29 @@ class MediaRepository(
         region: ContentRegion = ContentRegion.GLOBAL
     ): Result<List<TmdbMovie>> = withContext(Dispatchers.IO) {
         try {
-            val response = if (region == ContentRegion.GLOBAL) {
-                api.getPopularMovies(page, language = region.languageCode)
-            } else if (region.originalLanguages != null) {
-                api.discoverMovies(
-                    withOriginalLanguage = region.originalLanguages,
-                    language = region.languageCode,
-                    page = page,
-                    sortBy = "popularity.desc"
-                )
-            } else {
-                api.getPopularMovies(page, language = region.languageCode)
-            }
-            Result.success(response.results)
+            val filterParams = ContentFilter.discoverParams()
+            val list = fetchWithFilter(
+                initialPage = page,
+                fetchPage = { p ->
+                    if (region == ContentRegion.GLOBAL) {
+                        api.getPopularMovies(p, language = region.languageCode)
+                    } else if (region.originalLanguages != null) {
+                        api.discoverMovies(
+                            withOriginalLanguage = region.originalLanguages,
+                            language = region.languageCode,
+                            page = p,
+                            sortBy = "popularity.desc",
+                            withoutKeywords = filterParams.withoutKeywords,
+                            withoutCompanies = filterParams.withoutCompanies,
+                            includeAdult = false
+                        )
+                    } else {
+                        api.getPopularMovies(p, language = region.languageCode)
+                    }
+                },
+                filterFn = { filterMoviesWithReports(it) }
+            )
+            Result.success(list)
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -108,19 +183,29 @@ class MediaRepository(
         region: ContentRegion = ContentRegion.GLOBAL
     ): Result<List<TmdbMovie>> = withContext(Dispatchers.IO) {
         try {
-            val response = if (region == ContentRegion.GLOBAL) {
-                api.getTopRatedMovies(page, language = region.languageCode)
-            } else if (region.originalLanguages != null) {
-                api.discoverMovies(
-                    withOriginalLanguage = region.originalLanguages,
-                    language = region.languageCode,
-                    page = page,
-                    sortBy = "vote_average.desc"
-                )
-            } else {
-                api.getTopRatedMovies(page, language = region.languageCode)
-            }
-            Result.success(response.results)
+            val filterParams = ContentFilter.discoverParams()
+            val list = fetchWithFilter(
+                initialPage = page,
+                fetchPage = { p ->
+                    if (region == ContentRegion.GLOBAL) {
+                        api.getTopRatedMovies(p, language = region.languageCode)
+                    } else if (region.originalLanguages != null) {
+                        api.discoverMovies(
+                            withOriginalLanguage = region.originalLanguages,
+                            language = region.languageCode,
+                            page = p,
+                            sortBy = "vote_average.desc",
+                            withoutKeywords = filterParams.withoutKeywords,
+                            withoutCompanies = filterParams.withoutCompanies,
+                            includeAdult = false
+                        )
+                    } else {
+                        api.getTopRatedMovies(p, language = region.languageCode)
+                    }
+                },
+                filterFn = { filterMoviesWithReports(it) }
+            )
+            Result.success(list)
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -132,17 +217,34 @@ class MediaRepository(
         region: ContentRegion = ContentRegion.GLOBAL
     ): Result<List<TmdbMovie>> = withContext(Dispatchers.IO) {
         try {
-            val response = if (region.originalLanguages != null) {
-                api.discoverMovies(
-                    withGenres = genreId.toString(),
-                    withOriginalLanguage = region.originalLanguages,
-                    language = region.languageCode,
-                    page = page
-                )
-            } else {
-                api.discoverMoviesByGenre(genreId, page, language = region.languageCode)
-            }
-            Result.success(response.results)
+            val filterParams = ContentFilter.discoverParams()
+            val list = fetchWithFilter(
+                initialPage = page,
+                fetchPage = { p ->
+                    if (region.originalLanguages != null) {
+                        api.discoverMovies(
+                            withGenres = genreId.toString(),
+                            withOriginalLanguage = region.originalLanguages,
+                            language = region.languageCode,
+                            page = p,
+                            withoutKeywords = filterParams.withoutKeywords,
+                            withoutCompanies = filterParams.withoutCompanies,
+                            includeAdult = false
+                        )
+                    } else {
+                        api.discoverMoviesByGenre(
+                            genreId = genreId,
+                            page = p,
+                            language = region.languageCode,
+                            withoutKeywords = filterParams.withoutKeywords,
+                            withoutCompanies = filterParams.withoutCompanies,
+                            includeAdult = false
+                        )
+                    }
+                },
+                filterFn = { filterMoviesWithReports(it) }
+            )
+            Result.success(list)
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -164,7 +266,7 @@ class MediaRepository(
                 val deferreds = variants.map { variant ->
                     async {
                         try {
-                            api.searchMovies(variant, page, language = searchLanguage).results
+                            api.searchMovies(variant, page, language = searchLanguage, includeAdult = false).results
                         } catch (e: Exception) {
                             emptyList()
                         }
@@ -191,7 +293,7 @@ class MediaRepository(
                     }
                 }
 
-                Result.success(finalResults)
+                Result.success(filterMoviesWithReports(finalResults))
             }
         } catch (e: Exception) {
             Result.failure(e)
@@ -204,7 +306,10 @@ class MediaRepository(
     ): Result<TmdbMovieDetail> = withContext(Dispatchers.IO) {
         try {
             val detail = api.getMovieDetails(movieId, language = region.languageCode)
-            Result.success(detail)
+            val filteredSimilar = detail.similar?.let { sim ->
+                sim.copy(results = filterMoviesWithReports(sim.results))
+            }
+            Result.success(detail.copy(similar = filteredSimilar))
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -217,19 +322,29 @@ class MediaRepository(
         region: ContentRegion = ContentRegion.GLOBAL
     ): Result<List<TmdbTv>> = withContext(Dispatchers.IO) {
         try {
-            val response = if (region == ContentRegion.GLOBAL) {
-                api.getTrendingTv(timeWindow, page, language = region.languageCode)
-            } else if (region.originalLanguages != null) {
-                api.discoverTv(
-                    withOriginalLanguage = region.originalLanguages,
-                    language = region.languageCode,
-                    page = page,
-                    sortBy = "popularity.desc"
-                )
-            } else {
-                api.getTrendingTv(timeWindow, page, language = region.languageCode)
-            }
-            Result.success(response.results)
+            val filterParams = ContentFilter.discoverParams()
+            val list = fetchWithFilter(
+                initialPage = page,
+                fetchPage = { p ->
+                    if (region == ContentRegion.GLOBAL) {
+                        api.getTrendingTv(timeWindow, p, language = region.languageCode)
+                    } else if (region.originalLanguages != null) {
+                        api.discoverTv(
+                            withOriginalLanguage = region.originalLanguages,
+                            language = region.languageCode,
+                            page = p,
+                            sortBy = "popularity.desc",
+                            withoutKeywords = filterParams.withoutKeywords,
+                            withoutCompanies = filterParams.withoutCompanies,
+                            includeAdult = false
+                        )
+                    } else {
+                        api.getTrendingTv(timeWindow, p, language = region.languageCode)
+                    }
+                },
+                filterFn = { filterTvWithReports(it) }
+            )
+            Result.success(list)
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -240,19 +355,29 @@ class MediaRepository(
         region: ContentRegion = ContentRegion.GLOBAL
     ): Result<List<TmdbTv>> = withContext(Dispatchers.IO) {
         try {
-            val response = if (region == ContentRegion.GLOBAL) {
-                api.getPopularTv(page, language = region.languageCode)
-            } else if (region.originalLanguages != null) {
-                api.discoverTv(
-                    withOriginalLanguage = region.originalLanguages,
-                    language = region.languageCode,
-                    page = page,
-                    sortBy = "popularity.desc"
-                )
-            } else {
-                api.getPopularTv(page, language = region.languageCode)
-            }
-            Result.success(response.results)
+            val filterParams = ContentFilter.discoverParams()
+            val list = fetchWithFilter(
+                initialPage = page,
+                fetchPage = { p ->
+                    if (region == ContentRegion.GLOBAL) {
+                        api.getPopularTv(p, language = region.languageCode)
+                    } else if (region.originalLanguages != null) {
+                        api.discoverTv(
+                            withOriginalLanguage = region.originalLanguages,
+                            language = region.languageCode,
+                            page = p,
+                            sortBy = "popularity.desc",
+                            withoutKeywords = filterParams.withoutKeywords,
+                            withoutCompanies = filterParams.withoutCompanies,
+                            includeAdult = false
+                        )
+                    } else {
+                        api.getPopularTv(p, language = region.languageCode)
+                    }
+                },
+                filterFn = { filterTvWithReports(it) }
+            )
+            Result.success(list)
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -263,19 +388,29 @@ class MediaRepository(
         region: ContentRegion = ContentRegion.GLOBAL
     ): Result<List<TmdbTv>> = withContext(Dispatchers.IO) {
         try {
-            val response = if (region == ContentRegion.GLOBAL) {
-                api.getTopRatedTv(page, language = region.languageCode)
-            } else if (region.originalLanguages != null) {
-                api.discoverTv(
-                    withOriginalLanguage = region.originalLanguages,
-                    language = region.languageCode,
-                    page = page,
-                    sortBy = "vote_average.desc"
-                )
-            } else {
-                api.getTopRatedTv(page, language = region.languageCode)
-            }
-            Result.success(response.results)
+            val filterParams = ContentFilter.discoverParams()
+            val list = fetchWithFilter(
+                initialPage = page,
+                fetchPage = { p ->
+                    if (region == ContentRegion.GLOBAL) {
+                        api.getTopRatedTv(p, language = region.languageCode)
+                    } else if (region.originalLanguages != null) {
+                        api.discoverTv(
+                            withOriginalLanguage = region.originalLanguages,
+                            language = region.languageCode,
+                            page = p,
+                            sortBy = "vote_average.desc",
+                            withoutKeywords = filterParams.withoutKeywords,
+                            withoutCompanies = filterParams.withoutCompanies,
+                            includeAdult = false
+                        )
+                    } else {
+                        api.getTopRatedTv(p, language = region.languageCode)
+                    }
+                },
+                filterFn = { filterTvWithReports(it) }
+            )
+            Result.success(list)
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -287,17 +422,34 @@ class MediaRepository(
         region: ContentRegion = ContentRegion.GLOBAL
     ): Result<List<TmdbTv>> = withContext(Dispatchers.IO) {
         try {
-            val response = if (region.originalLanguages != null) {
-                api.discoverTv(
-                    withGenres = genreId.toString(),
-                    withOriginalLanguage = region.originalLanguages,
-                    language = region.languageCode,
-                    page = page
-                )
-            } else {
-                api.discoverTvByGenre(genreId, page, language = region.languageCode)
-            }
-            Result.success(response.results)
+            val filterParams = ContentFilter.discoverParams()
+            val list = fetchWithFilter(
+                initialPage = page,
+                fetchPage = { p ->
+                    if (region.originalLanguages != null) {
+                        api.discoverTv(
+                            withGenres = genreId.toString(),
+                            withOriginalLanguage = region.originalLanguages,
+                            language = region.languageCode,
+                            page = p,
+                            withoutKeywords = filterParams.withoutKeywords,
+                            withoutCompanies = filterParams.withoutCompanies,
+                            includeAdult = false
+                        )
+                    } else {
+                        api.discoverTvByGenre(
+                            genreId = genreId,
+                            page = p,
+                            language = region.languageCode,
+                            withoutKeywords = filterParams.withoutKeywords,
+                            withoutCompanies = filterParams.withoutCompanies,
+                            includeAdult = false
+                        )
+                    }
+                },
+                filterFn = { filterTvWithReports(it) }
+            )
+            Result.success(list)
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -319,7 +471,7 @@ class MediaRepository(
                 val deferreds = variants.map { variant ->
                     async {
                         try {
-                            api.searchTv(variant, page, language = searchLanguage).results
+                            api.searchTv(variant, page, language = searchLanguage, includeAdult = false).results
                         } catch (e: Exception) {
                             emptyList()
                         }
@@ -344,7 +496,7 @@ class MediaRepository(
                     }
                 }
 
-                Result.success(finalResults)
+                Result.success(filterTvWithReports(finalResults))
             }
         } catch (e: Exception) {
             Result.failure(e)
@@ -357,7 +509,10 @@ class MediaRepository(
     ): Result<TmdbTvDetail> = withContext(Dispatchers.IO) {
         try {
             val detail = api.getTvDetails(tvId, language = region.languageCode)
-            Result.success(detail)
+            val filteredSimilar = detail.similar?.let { sim ->
+                sim.copy(results = filterTvWithReports(sim.results))
+            }
+            Result.success(detail.copy(similar = filteredSimilar))
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -377,7 +532,20 @@ class MediaRepository(
     }
 
     // === ROOM WATCHLIST OPERATIONS ===
-    fun getAllWatchlist(): Flow<List<WatchlistEntity>> = watchlistDao.getAllWatchlist()
+    fun getAllWatchlist(): Flow<List<WatchlistEntity>> = combine(
+        watchlistDao.getAllWatchlist(),
+        ContentFilter.blocklist,
+        reportStore.reportedIdsFlow
+    ) { list, _, reportedIds ->
+        list.filter { entity ->
+            if (reportedIds.contains(entity.id)) return@filter false
+            if (entity.mediaType == "tv") {
+                !ContentFilter.isBlockedTv(id = entity.id, name = entity.title)
+            } else {
+                !ContentFilter.isBlockedMovie(id = entity.id, title = entity.title)
+            }
+        }
+    }
 
     suspend fun addToWatchlist(item: WatchlistEntity) = withContext(Dispatchers.IO) {
         watchlistDao.addToWatchlist(item)
@@ -423,7 +591,20 @@ class MediaRepository(
     }
 
     // === ROOM RECENT HISTORY OPERATIONS ===
-    fun getAllHistory(): Flow<List<RecentHistoryEntity>> = recentHistoryDao.getAllHistory()
+    fun getAllHistory(): Flow<List<RecentHistoryEntity>> = combine(
+        recentHistoryDao.getAllHistory(),
+        ContentFilter.blocklist,
+        reportStore.reportedIdsFlow
+    ) { list, _, reportedIds ->
+        list.filter { entity ->
+            if (reportedIds.contains(entity.mediaId)) return@filter false
+            if (entity.mediaType == "tv") {
+                !ContentFilter.isBlockedTv(id = entity.mediaId, name = entity.title)
+            } else {
+                !ContentFilter.isBlockedMovie(id = entity.mediaId, title = entity.title)
+            }
+        }
+    }
 
     suspend fun savePlaybackProgress(
         mediaId: Int,
@@ -473,17 +654,22 @@ class MediaRepository(
         region: ContentRegion = ContentRegion.GLOBAL
     ): Result<List<TmdbMovie>> = withContext(Dispatchers.IO) {
         try {
+            val filterParams = ContentFilter.discoverParams()
             val response = if (region != ContentRegion.GLOBAL && region.originalLanguages != null) {
                 api.discoverMovies(
                     withOriginalLanguage = region.originalLanguages,
                     language = region.languageCode,
                     page = page,
-                    sortBy = "primary_release_date.desc"
+                    sortBy = "primary_release_date.desc",
+                    withoutKeywords = filterParams.withoutKeywords,
+                    withoutCompanies = filterParams.withoutCompanies,
+                    includeAdult = false
                 )
             } else {
                 api.getNowPlayingMovies(page = page, language = region.languageCode)
             }
-            Result.success(response.results.filter { !it.releaseDate.isNullOrBlank() })
+            val valid = response.results.filter { !it.releaseDate.isNullOrBlank() }
+            Result.success(filterMoviesWithReports(valid))
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -494,18 +680,21 @@ class MediaRepository(
         region: ContentRegion = ContentRegion.GLOBAL
     ): Result<List<TmdbTv>> = withContext(Dispatchers.IO) {
         try {
+            val filterParams = ContentFilter.discoverParams()
             val response = if (region != ContentRegion.GLOBAL && region.originalLanguages != null) {
                 api.discoverTv(
                     withOriginalLanguage = region.originalLanguages,
                     language = region.languageCode,
                     page = page,
-                    sortBy = "first_air_date.desc"
+                    sortBy = "first_air_date.desc",
+                    withoutKeywords = filterParams.withoutKeywords,
+                    withoutCompanies = filterParams.withoutCompanies,
+                    includeAdult = false
                 )
             } else {
                 api.getOnTheAirTv(page = page, language = region.languageCode)
             }
-            // Return full series items so user sees whole show, not single episode
-            Result.success(response.results)
+            Result.success(filterTvWithReports(response.results))
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -561,7 +750,7 @@ class MediaRepository(
             } else {
                 combined
             }
-            Result.success(filtered)
+            Result.success(filterCompaniesWithReports(filtered))
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -595,6 +784,7 @@ class MediaRepository(
         region: ContentRegion = ContentRegion.GLOBAL
     ): Result<List<TmdbMovie>> = withContext(Dispatchers.IO) {
         try {
+            val filterParams = ContentFilter.discoverParams()
             val allMovies = mutableListOf<TmdbMovie>()
             var currentPage = 1
             var totalPages = 1
@@ -605,13 +795,17 @@ class MediaRepository(
                     withCompanies = companyId.toString(),
                     language = region.languageCode,
                     page = currentPage,
-                    sortBy = sortBy
+                    sortBy = sortBy,
+                    withoutKeywords = filterParams.withoutKeywords,
+                    withoutCompanies = filterParams.withoutCompanies,
+                    includeAdult = false
                 )
                 allMovies.addAll(res.results)
                 totalPages = res.totalPages
                 currentPage++
             }
-            Result.success(allMovies.distinctBy { it.id })
+            val filtered = filterMoviesWithReports(allMovies.distinctBy { it.id })
+            Result.success(filtered)
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -624,6 +818,7 @@ class MediaRepository(
         region: ContentRegion = ContentRegion.GLOBAL
     ): Result<List<TmdbTv>> = withContext(Dispatchers.IO) {
         try {
+            val filterParams = ContentFilter.discoverParams()
             val allTv = mutableListOf<TmdbTv>()
             var currentPage = 1
             var totalPages = 1
@@ -634,19 +829,32 @@ class MediaRepository(
                     withCompanies = companyId.toString(),
                     language = region.languageCode,
                     page = currentPage,
-                    sortBy = sortBy
+                    sortBy = sortBy,
+                    withoutKeywords = filterParams.withoutKeywords,
+                    withoutCompanies = filterParams.withoutCompanies,
+                    includeAdult = false
                 )
                 allTv.addAll(res.results)
                 totalPages = res.totalPages
                 currentPage++
             }
-            Result.success(allTv.distinctBy { it.id })
+            val filtered = filterTvWithReports(allTv.distinctBy { it.id })
+            Result.success(filtered)
         } catch (e: Exception) {
             Result.failure(e)
         }
     }
 
-    fun getAllSavedCompanies(): Flow<List<SavedCompanyEntity>> = savedCompanyDao.getAllSavedCompanies()
+    fun getAllSavedCompanies(): Flow<List<SavedCompanyEntity>> = combine(
+        savedCompanyDao.getAllSavedCompanies(),
+        ContentFilter.blocklist,
+        reportStore.reportedIdsFlow
+    ) { list, _, reportedIds ->
+        list.filter { entity ->
+            if (reportedIds.contains(entity.companyId)) return@filter false
+            !ContentFilter.isBlockedCompany(companyId = entity.companyId, companyName = entity.name)
+        }
+    }
 
     suspend fun isCompanySaved(companyId: Int): Boolean = withContext(Dispatchers.IO) {
         savedCompanyDao.isCompanySavedSync(companyId)
@@ -685,8 +893,9 @@ class MediaRepository(
         if (trimmed.isBlank()) return@withContext Result.success(emptyList())
         try {
             val lang = if (ArabicSearchHelper.isArabic(trimmed) || region == ContentRegion.ARABIC) "ar-SA" else region.languageCode
-            val res = api.searchPeople(query = trimmed, page = 1, language = lang)
-            Result.success(res.results.sortedByDescending { it.popularity })
+            val res = api.searchPeople(query = trimmed, page = 1, language = lang, includeAdult = false)
+            val filtered = filterPeopleWithReports(res.results.sortedByDescending { it.popularity })
+            Result.success(filtered)
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -698,7 +907,8 @@ class MediaRepository(
         try {
             val lang = if (region == ContentRegion.ARABIC) "ar-SA" else region.languageCode
             val res = api.getPopularPeople(page = 1, language = lang)
-            Result.success(res.results)
+            val filtered = filterPeopleWithReports(res.results)
+            Result.success(filtered)
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -711,7 +921,14 @@ class MediaRepository(
         try {
             val lang = if (region == ContentRegion.ARABIC) "ar-SA" else region.languageCode
             val detail = api.getPersonDetails(personId, language = lang)
-            Result.success(detail)
+            // Filter person's credits, but keep person visible unless person is adult or blocked
+            val filteredMovieCredits = detail.movieCredits?.let { mc ->
+                mc.copy(cast = filterMoviesWithReports(mc.cast))
+            }
+            val filteredTvCredits = detail.tvCredits?.let { tc ->
+                tc.copy(cast = filterTvWithReports(tc.cast))
+            }
+            Result.success(detail.copy(movieCredits = filteredMovieCredits, tvCredits = filteredTvCredits))
         } catch (e: Exception) {
             Result.failure(e)
         }

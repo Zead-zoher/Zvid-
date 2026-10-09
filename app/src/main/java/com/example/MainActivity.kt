@@ -19,13 +19,17 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.data.report.ReportTargetType
 import com.example.ui.components.AppTopBar
 import com.example.ui.components.BottomNavBar
 import com.example.ui.components.SettingsDrawer
 import com.example.ui.modals.MediaDetailModal
 import com.example.ui.modals.PeopleDialogModal
+import com.example.ui.modals.ReportDialog
 import com.example.ui.modals.ResolutionOverlayModal
 import com.example.ui.modals.StreamOptionDialog
+import com.example.ui.modals.UnavailableContentDialog
 import com.example.ui.player.PlayerScreen
 import com.example.ui.screens.CompaniesScreen
 import com.example.ui.screens.MoviesScreen
@@ -36,6 +40,7 @@ import com.example.ui.theme.MyApplicationTheme
 import com.example.ui.theme.NetflixBlack
 import com.example.viewmodel.AppTab
 import com.example.viewmodel.MainViewModel
+import com.example.viewmodel.ReportViewModel
 import kotlinx.coroutines.flow.collectLatest
 
 class MainActivity : ComponentActivity() {

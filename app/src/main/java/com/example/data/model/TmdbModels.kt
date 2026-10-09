@@ -23,7 +23,8 @@ data class TmdbMovie(
     @Json(name = "vote_average") val voteAverage: Double = 0.0,
     @Json(name = "vote_count") val voteCount: Int = 0,
     @Json(name = "original_language") val originalLanguage: String? = null,
-    @Json(name = "genre_ids") val genreIds: List<Int>? = null
+    @Json(name = "genre_ids") val genreIds: List<Int>? = null,
+    @Json(name = "adult") val adult: Boolean = false
 ) {
     val displayTitle: String get() = title ?: originalTitle ?: "Untitled Movie"
     val year: String get() = releaseDate?.take(4) ?: "N/A"
@@ -43,7 +44,8 @@ data class TmdbTv(
     @Json(name = "vote_average") val voteAverage: Double = 0.0,
     @Json(name = "vote_count") val voteCount: Int = 0,
     @Json(name = "original_language") val originalLanguage: String? = null,
-    @Json(name = "genre_ids") val genreIds: List<Int>? = null
+    @Json(name = "genre_ids") val genreIds: List<Int>? = null,
+    @Json(name = "adult") val adult: Boolean = false
 ) {
     val displayTitle: String get() = name ?: originalName ?: "Untitled Show"
     val year: String get() = firstAirDate?.take(4) ?: "N/A"
@@ -58,11 +60,18 @@ data class TmdbGenre(
 )
 
 @JsonClass(generateAdapter = true)
+data class TmdbKeyword(
+    @Json(name = "id") val id: Int,
+    @Json(name = "name") val name: String
+)
+
+@JsonClass(generateAdapter = true)
 data class TmdbProductionCompany(
     @Json(name = "id") val id: Int,
     @Json(name = "name") val name: String,
     @Json(name = "logo_path") val logoPath: String? = null,
-    @Json(name = "origin_country") val originCountry: String? = null
+    @Json(name = "origin_country") val originCountry: String? = null,
+    @Json(name = "adult") val adult: Boolean = false
 ) {
     val fullLogoUrl: String? get() = logoPath?.let { "https://image.tmdb.org/t/p/w500$it" }
 }
@@ -96,7 +105,8 @@ data class TmdbMovieDetail(
     @Json(name = "external_ids") val externalIds: TmdbExternalIds? = null,
     @Json(name = "videos") val videos: TmdbVideoContainer? = null,
     @Json(name = "credits") val credits: TmdbCredits? = null,
-    @Json(name = "similar") val similar: TmdbPagedResponse<TmdbMovie>? = null
+    @Json(name = "similar") val similar: TmdbPagedResponse<TmdbMovie>? = null,
+    @Json(name = "adult") val adult: Boolean = false
 ) {
     val effectiveImdbId: String? get() = imdbId ?: externalIds?.imdbId
     val displayTitle: String get() = title ?: originalTitle ?: "Untitled Movie"
@@ -137,7 +147,8 @@ data class TmdbTvDetail(
     @Json(name = "seasons") val seasons: List<TmdbSeasonSummary>? = null,
     @Json(name = "videos") val videos: TmdbVideoContainer? = null,
     @Json(name = "credits") val credits: TmdbCredits? = null,
-    @Json(name = "similar") val similar: TmdbPagedResponse<TmdbTv>? = null
+    @Json(name = "similar") val similar: TmdbPagedResponse<TmdbTv>? = null,
+    @Json(name = "adult") val adult: Boolean = false
 ) {
     val effectiveImdbId: String? get() = externalIds?.imdbId
     val displayTitle: String get() = name ?: originalName ?: "Untitled Show"
@@ -236,7 +247,8 @@ data class TmdbPerson(
     @Json(name = "original_name") val originalName: String? = null,
     @Json(name = "profile_path") val profilePath: String? = null,
     @Json(name = "known_for_department") val knownForDepartment: String? = null,
-    @Json(name = "popularity") val popularity: Double = 0.0
+    @Json(name = "popularity") val popularity: Double = 0.0,
+    @Json(name = "adult") val adult: Boolean = false
 ) {
     val fullProfileUrl: String? get() = profilePath?.let { "https://image.tmdb.org/t/p/w500$it" }
 }
@@ -267,7 +279,8 @@ data class TmdbPersonCreditItem(
     @Json(name = "backdrop_path") val backdropPath: String? = null,
     @Json(name = "release_date") val releaseDate: String? = null,
     @Json(name = "first_air_date") val firstAirDate: String? = null,
-    @Json(name = "vote_average") val voteAverage: Double = 0.0
+    @Json(name = "vote_average") val voteAverage: Double = 0.0,
+    @Json(name = "adult") val adult: Boolean = false
 ) {
     val displayTitle: String get() = title ?: name ?: "Untitled"
     val year: String get() = (releaseDate ?: firstAirDate)?.take(4) ?: "N/A"
@@ -285,7 +298,8 @@ data class TmdbPersonDetail(
     @Json(name = "profile_path") val profilePath: String? = null,
     @Json(name = "known_for_department") val knownForDepartment: String? = null,
     @Json(name = "movie_credits") val movieCredits: TmdbPersonMovieCredits? = null,
-    @Json(name = "tv_credits") val tvCredits: TmdbPersonTvCredits? = null
+    @Json(name = "tv_credits") val tvCredits: TmdbPersonTvCredits? = null,
+    @Json(name = "adult") val adult: Boolean = false
 ) {
     val fullProfileUrl: String? get() = profilePath?.let { "https://image.tmdb.org/t/p/w500$it" }
 }

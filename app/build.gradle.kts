@@ -1,4 +1,6 @@
 import com.google.gms.googleservices.GoogleServicesPlugin.MissingGoogleServicesStrategy
+import java.io.FileInputStream
+import java.util.Properties
 
 plugins {
   alias(libs.plugins.android.application)
@@ -7,6 +9,21 @@ plugins {
   alias(libs.plugins.secrets)
   alias(libs.plugins.google.services)
 }
+
+val localProps = Properties().apply {
+  val propFile = rootProject.file("local.properties")
+  if (propFile.exists()) {
+    FileInputStream(propFile).use { load(it) }
+  }
+}
+
+val telegramBotToken: String = localProps.getProperty("TELEGRAM_BOT_TOKEN")
+  ?: System.getenv("TELEGRAM_BOT_TOKEN")
+  ?: ""
+
+val telegramChatId: String = localProps.getProperty("TELEGRAM_CHAT_ID")
+  ?: System.getenv("TELEGRAM_CHAT_ID")
+  ?: ""
 
 android {
   namespace = "com.example"
@@ -20,6 +37,9 @@ android {
     versionName = "1.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+    buildConfigField("String", "TELEGRAM_BOT_TOKEN", "\"$telegramBotToken\"")
+    buildConfigField("String", "TELEGRAM_CHAT_ID", "\"$telegramChatId\"")
   }
 
   signingConfigs {

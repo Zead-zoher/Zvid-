@@ -39,11 +39,14 @@ interface TmdbApi {
         @Query("with_genres") withGenres: String? = null,
         @Query("with_companies") withCompanies: String? = null,
         @Query("with_keywords") withKeywords: String? = null,
+        @Query("without_keywords") withoutKeywords: String? = null,
+        @Query("without_companies") withoutCompanies: String? = null,
         @Query("with_original_language") withOriginalLanguage: String? = null,
         @Query("region") region: String? = null,
         @Query("language") language: String? = null,
         @Query("page") page: Int = 1,
-        @Query("sort_by") sortBy: String = "popularity.desc"
+        @Query("sort_by") sortBy: String = "popularity.desc",
+        @Query("include_adult") includeAdult: Boolean = false
     ): TmdbPagedResponse<TmdbMovie>
 
     @GET("discover/movie")
@@ -51,7 +54,10 @@ interface TmdbApi {
         @Query("with_genres") genreId: Int,
         @Query("page") page: Int = 1,
         @Query("sort_by") sortBy: String = "popularity.desc",
-        @Query("language") language: String? = null
+        @Query("language") language: String? = null,
+        @Query("without_keywords") withoutKeywords: String? = null,
+        @Query("without_companies") withoutCompanies: String? = null,
+        @Query("include_adult") includeAdult: Boolean = false
     ): TmdbPagedResponse<TmdbMovie>
 
     @GET("search/movie")
@@ -61,6 +67,12 @@ interface TmdbApi {
         @Query("language") language: String? = null,
         @Query("include_adult") includeAdult: Boolean = false
     ): TmdbPagedResponse<TmdbMovie>
+
+    @GET("search/keyword")
+    suspend fun searchKeywords(
+        @Query("query") query: String,
+        @Query("page") page: Int = 1
+    ): TmdbPagedResponse<com.example.data.model.TmdbKeyword>
 
     @GET("movie/{movie_id}")
     suspend fun getMovieDetails(
@@ -107,10 +119,13 @@ interface TmdbApi {
         @Query("with_genres") withGenres: String? = null,
         @Query("with_companies") withCompanies: String? = null,
         @Query("with_keywords") withKeywords: String? = null,
+        @Query("without_keywords") withoutKeywords: String? = null,
+        @Query("without_companies") withoutCompanies: String? = null,
         @Query("with_original_language") withOriginalLanguage: String? = null,
         @Query("language") language: String? = null,
         @Query("page") page: Int = 1,
-        @Query("sort_by") sortBy: String = "popularity.desc"
+        @Query("sort_by") sortBy: String = "popularity.desc",
+        @Query("include_adult") includeAdult: Boolean = false
     ): TmdbPagedResponse<TmdbTv>
 
     @GET("discover/tv")
@@ -118,7 +133,10 @@ interface TmdbApi {
         @Query("with_genres") genreId: Int,
         @Query("page") page: Int = 1,
         @Query("sort_by") sortBy: String = "popularity.desc",
-        @Query("language") language: String? = null
+        @Query("language") language: String? = null,
+        @Query("without_keywords") withoutKeywords: String? = null,
+        @Query("without_companies") withoutCompanies: String? = null,
+        @Query("include_adult") includeAdult: Boolean = false
     ): TmdbPagedResponse<TmdbTv>
 
     @GET("search/tv")

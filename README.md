@@ -98,6 +98,23 @@ Zvid runs immediately with a temporary key. To use your own TMDB API key:
 
 ---
 
+## Configuration (Telegram Reporting)
+
+The app includes an in-app report feature that dispatches user reports directly to a configured Telegram bot. To configure the Telegram integration:
+
+- **Local Builds**: Add the following to your untracked `local.properties`:
+  ```properties
+  TELEGRAM_BOT_TOKEN=your_bot_token_here
+  TELEGRAM_CHAT_ID=your_chat_id_here
+  ```
+- **GitHub Actions**: Add the repository secrets under **Settings > Secrets and variables > Actions**:
+  - `TELEGRAM_BOT_TOKEN`
+  - `TELEGRAM_CHAT_ID`
+
+If not configured, the app builds normally and shows a friendly notice if a report is submitted.
+
+---
+
 ## Roadmap
 
 Upcoming features and improvements planned for Zvid:
