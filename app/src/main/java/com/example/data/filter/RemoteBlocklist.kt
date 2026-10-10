@@ -1,55 +1,28 @@
 package com.example.data.filter
 
 import android.content.Context
-import com.squareup.moshi.Json
-import com.squareup.moshi.JsonClass
-import com.squareup.moshi.Moshi
-import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import org.json.JSONObject
 import java.io.File
 import java.util.concurrent.TimeUnit
-
-@JsonClass(generateAdapter = true)
-data class RemoteBlocklistDto(
-    @Json(name = "version") val version: Int = 1,
-    @Json(name = "movies") val movies: List<Int> = emptyList(),
-    @Json(name = "tv") val tv: List<Int> = emptyList(),
-    @Json(name = "companies") val companies: List<Int> = emptyList(),
-    @Json(name = "people") val people: List<Int> = emptyList(),
-    @Json(name = "keywords") val keywords: List<Int> = emptyList()
-) {
-    fun toBlocklist(): Blocklist = Blocklist(
-        movies = movies.toSet(),
-        tv = tv.toSet(),
-        companies = companies.toSet(),
-        people = people.toSet(),
-        keywords = keywords.toSet()
-    )
-}
 
 class RemoteBlocklist(private val context: Context) {
 
     companion object {
         const val BLOCKLIST_URL = "https://raw.githubusercontent.com/Zead-zoher/Zvid-/main/blocklist.json"
+        const val FALLBACK_BLOCKLIST_URL = "https://github.com/Zead-zoher/Zvid-/raw/main/blocklist.json"
         private const val PREFS_NAME = "remote_blocklist_prefs"
         private const val KEY_LAST_FETCH = "last_blocklist_fetch_ms"
         private const val CACHE_FILE_NAME = "cached_blocklist.json"
-        private val SIX_HOURS_MS = TimeUnit.HOURS.toMillis(6)
     }
 
     private val httpClient = OkHttpClient.Builder()
-        .connectTimeout(10, TimeUnit.SECONDS)
-        .readTimeout(10, TimeUnit.SECONDS)
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(15, TimeUnit.SECONDS)
         .build()
-
-    private val moshi = Moshi.Builder()
-        .addLast(KotlinJsonAdapterFactory())
-        .build()
-
-    private val adapter = moshi.adapter(RemoteBlocklistDto::class.java)
 
     suspend fun initialize() = withContext(Dispatchers.IO) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -58,13 +31,13 @@ class RemoteBlocklist(private val context: Context) {
         var parsedBlocklist: Blocklist? = null
 
         // 1. Fresh download from GitHub repository (Always attempt first to ensure latest updates)
-        val remoteJson = downloadRemoteJson()
+        val remoteJson = downloadRemoteJson(BLOCKLIST_URL) ?: downloadRemoteJson(FALLBACK_BLOCKLIST_URL)
         if (!remoteJson.isNullOrBlank()) {
             val parsed = parseJson(remoteJson)
             if (parsed != null) {
                 saveToDiskCache(remoteJson)
                 prefs.edit().putLong(KEY_LAST_FETCH, now).apply()
-                parsedBlocklist = parsed.toBlocklist()
+                parsedBlocklist = parsed
             }
         }
 
@@ -72,7 +45,7 @@ class RemoteBlocklist(private val context: Context) {
         if (parsedBlocklist == null) {
             val cachedJson = loadFromDiskCache()
             if (!cachedJson.isNullOrBlank()) {
-                parsedBlocklist = parseJson(cachedJson)?.toBlocklist()
+                parsedBlocklist = parseJson(cachedJson)
             }
         }
 
@@ -80,7 +53,7 @@ class RemoteBlocklist(private val context: Context) {
         if (parsedBlocklist == null) {
             val assetJson = loadFromAssets()
             if (!assetJson.isNullOrBlank()) {
-                parsedBlocklist = parseJson(assetJson)?.toBlocklist()
+                parsedBlocklist = parseJson(assetJson)
             }
         }
 
@@ -89,10 +62,10 @@ class RemoteBlocklist(private val context: Context) {
         ContentFilter.updateBlocklist(finalBlocklist)
     }
 
-    private fun downloadRemoteJson(): String? {
+    private fun downloadRemoteJson(url: String): String? {
         return try {
             val request = Request.Builder()
-                .url(BLOCKLIST_URL)
+                .url(url)
                 .header("Accept", "application/json")
                 .header("Cache-Control", "no-cache")
                 .build()
@@ -135,11 +108,86 @@ class RemoteBlocklist(private val context: Context) {
         }
     }
 
-    private fun parseJson(json: String): RemoteBlocklistDto? {
+    private fun parseJson(json: String): Blocklist? {
         return try {
-            adapter.fromJson(json)
+            val root = JSONObject(json)
+            val movies = mutableSetOf<Int>()
+            root.optJSONArray("movies")?.let { arr ->
+                for (i in 0 until arr.length()) {
+                    val id = arr.optInt(i, -1)
+                    if (id > 0) movies.add(id)
+                }
+            }
+
+            val tv = mutableSetOf<Int>()
+            root.optJSONArray("tv")?.let { arr ->
+                for (i in 0 until arr.length()) {
+                    val id = arr.optInt(i, -1)
+                    if (id > 0) tv.add(id)
+                }
+            }
+
+            val companies = mutableSetOf<Int>()
+            root.optJSONArray("companies")?.let { arr ->
+                for (i in 0 until arr.length()) {
+                    val id = arr.optInt(i, -1)
+                    if (id > 0) companies.add(id)
+                }
+            }
+
+            val people = mutableSetOf<Int>()
+            root.optJSONArray("people")?.let { arr ->
+                for (i in 0 until arr.length()) {
+                    val id = arr.optInt(i, -1)
+                    if (id > 0) people.add(id)
+                }
+            }
+
+            val keywords = mutableSetOf<Int>()
+            val words = mutableSetOf<String>()
+
+            root.optJSONArray("keywords")?.let { arr ->
+                for (i in 0 until arr.length()) {
+                    val item = arr.opt(i)
+                    when (item) {
+                        is Number -> {
+                            val id = item.toInt()
+                            if (id > 0) keywords.add(id)
+                        }
+                        is String -> {
+                            val intVal = item.toIntOrNull()
+                            if (intVal != null && intVal > 0) {
+                                keywords.add(intVal)
+                            } else if (item.isNotBlank()) {
+                                words.add(item.trim())
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Also check for optional explicit blocked_words or words list
+            val wordsArr = root.optJSONArray("blocked_words") ?: root.optJSONArray("words")
+            wordsArr?.let { arr ->
+                for (i in 0 until arr.length()) {
+                    val str = arr.optString(i)
+                    if (!str.isNullOrBlank()) {
+                        words.add(str.trim())
+                    }
+                }
+            }
+
+            Blocklist(
+                movies = movies,
+                tv = tv,
+                companies = companies,
+                people = people,
+                keywords = keywords,
+                words = words
+            )
         } catch (_: Exception) {
             null
         }
     }
 }
+

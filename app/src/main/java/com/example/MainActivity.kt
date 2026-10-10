@@ -531,10 +531,6 @@ fun MainAppContent(viewModel: MainViewModel) {
             onKeyInputChanged = { newKey -> viewModel.updateApiKeyInput(newKey) },
             onSaveKey = { key -> viewModel.saveAndValidateApiKey(key) },
             onUseDemoKey = { viewModel.useDemoKey() },
-            reportStore = reportViewModel.reportStore,
-            onTestTelegram = { token, chatId, callback ->
-                reportViewModel.testTelegramConfig(token, chatId, callback)
-            },
             onDismiss = { viewModel.closeSettings() }
         )
 

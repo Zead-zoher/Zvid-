@@ -46,6 +46,7 @@ interface TmdbApi {
         @Query("language") language: String? = null,
         @Query("page") page: Int = 1,
         @Query("sort_by") sortBy: String = "popularity.desc",
+        @Query("vote_count.gte") voteCountGte: Int? = null,
         @Query("include_adult") includeAdult: Boolean = false
     ): TmdbPagedResponse<TmdbMovie>
 
@@ -77,7 +78,7 @@ interface TmdbApi {
     @GET("movie/{movie_id}")
     suspend fun getMovieDetails(
         @Path("movie_id") movieId: Int,
-        @Query("append_to_response") appendToResponse: String = "credits,videos,similar",
+        @Query("append_to_response") appendToResponse: String = "credits,videos,similar,keywords",
         @Query("language") language: String? = null
     ): TmdbMovieDetail
 
@@ -125,6 +126,7 @@ interface TmdbApi {
         @Query("language") language: String? = null,
         @Query("page") page: Int = 1,
         @Query("sort_by") sortBy: String = "popularity.desc",
+        @Query("vote_count.gte") voteCountGte: Int? = null,
         @Query("include_adult") includeAdult: Boolean = false
     ): TmdbPagedResponse<TmdbTv>
 
@@ -150,7 +152,7 @@ interface TmdbApi {
     @GET("tv/{tv_id}")
     suspend fun getTvDetails(
         @Path("tv_id") tvId: Int,
-        @Query("append_to_response") appendToResponse: String = "credits,videos,similar",
+        @Query("append_to_response") appendToResponse: String = "credits,videos,similar,keywords",
         @Query("language") language: String? = null
     ): TmdbTvDetail
 

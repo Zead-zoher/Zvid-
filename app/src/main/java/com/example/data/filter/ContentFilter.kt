@@ -18,7 +18,8 @@ data class Blocklist(
     val tv: Set<Int> = emptySet(),
     val companies: Set<Int> = emptySet(),
     val people: Set<Int> = emptySet(),
-    val keywords: Set<Int> = emptySet()
+    val keywords: Set<Int> = emptySet(),
+    val words: Set<String> = emptySet()
 )
 
 data class DiscoverFilterParams(
@@ -40,19 +41,21 @@ object ContentFilter {
     val BUILT_IN_COMPANIES: Set<Int> = emptySet()
     val BUILT_IN_PEOPLE: Set<Int> = emptySet()
     val BUILT_IN_KEYWORDS: Set<Int> = emptySet()
+    val BUILT_IN_WORDS: Set<String> = emptySet()
 
     private val initialBlocklist = Blocklist(
         movies = BUILT_IN_MOVIES,
         tv = BUILT_IN_TV,
         companies = BUILT_IN_COMPANIES,
         people = BUILT_IN_PEOPLE,
-        keywords = BUILT_IN_KEYWORDS
+        keywords = BUILT_IN_KEYWORDS,
+        words = BUILT_IN_WORDS
     )
 
     private val _blocklist = MutableStateFlow(initialBlocklist)
     val blocklist: StateFlow<Blocklist> = _blocklist.asStateFlow()
 
-    // Sets of works (movies and TV shows) derived from blocked actors and blocked companies
+    // Sets of works (movies and TV shows) derived from blocked actors, blocked companies, and blocked keywords
     private val _derivedBlockedMovieIds = MutableStateFlow<Set<Int>>(emptySet())
     val derivedBlockedMovieIds: StateFlow<Set<Int>> = _derivedBlockedMovieIds.asStateFlow()
 
@@ -77,7 +80,8 @@ object ContentFilter {
             tv = BUILT_IN_TV + remoteBlocklist.tv,
             companies = BUILT_IN_COMPANIES + remoteBlocklist.companies,
             people = BUILT_IN_PEOPLE + remoteBlocklist.people,
-            keywords = BUILT_IN_KEYWORDS + remoteBlocklist.keywords
+            keywords = BUILT_IN_KEYWORDS + remoteBlocklist.keywords,
+            words = BUILT_IN_WORDS + remoteBlocklist.words
         )
     }
 
@@ -89,12 +93,27 @@ object ContentFilter {
         return _blocklist.value.companies
     }
 
+    fun getAllBlockedKeywordIds(): Set<Int> {
+        val defaultKeywordList = BLOCKED_KEYWORD_IDS.split(",")
+            .mapNotNull { it.trim().toIntOrNull() }
+            .toSet()
+        return defaultKeywordList + _blocklist.value.keywords
+    }
+
+    fun getAllBlockedWords(): Set<String> {
+        return _blocklist.value.words
+    }
+
     fun isBlockedPersonId(id: Int): Boolean {
         return getAllBlockedPeopleIds().contains(id)
     }
 
     fun isBlockedCompanyId(id: Int): Boolean {
         return getAllBlockedCompanyIds().contains(id)
+    }
+
+    fun isBlockedKeywordId(id: Int): Boolean {
+        return getAllBlockedKeywordIds().contains(id)
     }
 
     fun addDerivedBlockedWorks(movieIds: Collection<Int>, tvIds: Collection<Int>) {
@@ -115,15 +134,25 @@ object ContentFilter {
     }
 
     fun matchesSexualText(vararg texts: String?): Boolean {
+        val customWords = _blocklist.value.words
         for (text in texts) {
             if (!text.isNullOrBlank()) {
                 val trimmed = text.trim()
                 if (SEXUAL_WORD_REGEX.containsMatchIn(trimmed) || ARABIC_SEXUAL_REGEX.containsMatchIn(trimmed)) {
                     return true
                 }
+                for (w in customWords) {
+                    if (w.isNotBlank() && trimmed.contains(w, ignoreCase = true)) {
+                        return true
+                    }
+                }
             }
         }
         return false
+    }
+
+    fun isBlockedSearchQuery(query: String): Boolean {
+        return matchesSexualText(query)
     }
 
     // === MOVIE CHECKS ===
@@ -142,6 +171,13 @@ object ContentFilter {
         if (current.movies.contains(movieDetail.id)) return true
         if (_derivedBlockedMovieIds.value.contains(movieDetail.id)) return true
         if (matchesSexualText(movieDetail.title, movieDetail.originalTitle, movieDetail.overview, movieDetail.tagline)) return true
+
+        // Check if any keyword in this movie is blocked
+        val kwList = movieDetail.keywordsContainer?.keywords
+        if (kwList != null && kwList.any { isBlockedKeywordId(it.id) || matchesSexualText(it.name) }) {
+            addDerivedBlockedMovie(movieDetail.id)
+            return true
+        }
 
         // Check if any company producing this movie is blocked
         val companies = movieDetail.productionCompanies
@@ -166,13 +202,18 @@ object ContentFilter {
         originalTitle: String? = null,
         adult: Boolean = false,
         companyIds: List<Int> = emptyList(),
-        castIds: List<Int> = emptyList()
+        castIds: List<Int> = emptyList(),
+        keywordIds: List<Int> = emptyList()
     ): Boolean {
         if (adult) return true
         val current = _blocklist.value
         if (current.movies.contains(id)) return true
         if (_derivedBlockedMovieIds.value.contains(id)) return true
         if (matchesSexualText(title, originalTitle)) return true
+        if (keywordIds.any { isBlockedKeywordId(it) }) {
+            addDerivedBlockedMovie(id)
+            return true
+        }
         if (companyIds.any { isBlockedCompanyId(it) }) {
             addDerivedBlockedMovie(id)
             return true
@@ -201,6 +242,13 @@ object ContentFilter {
         if (_derivedBlockedTvIds.value.contains(tvDetail.id)) return true
         if (matchesSexualText(tvDetail.name, tvDetail.originalName, tvDetail.overview, tvDetail.tagline)) return true
 
+        // Check if any keyword in this TV show is blocked
+        val kwList = tvDetail.keywordsContainer?.results
+        if (kwList != null && kwList.any { isBlockedKeywordId(it.id) || matchesSexualText(it.name) }) {
+            addDerivedBlockedTv(tvDetail.id)
+            return true
+        }
+
         // Check if any company producing this TV show is blocked
         val companies = tvDetail.productionCompanies
         if (companies != null && companies.any { isBlockedCompanyId(it.id) }) {
@@ -224,13 +272,18 @@ object ContentFilter {
         originalName: String? = null,
         adult: Boolean = false,
         companyIds: List<Int> = emptyList(),
-        castIds: List<Int> = emptyList()
+        castIds: List<Int> = emptyList(),
+        keywordIds: List<Int> = emptyList()
     ): Boolean {
         if (adult) return true
         val current = _blocklist.value
         if (current.tv.contains(id)) return true
         if (_derivedBlockedTvIds.value.contains(id)) return true
         if (matchesSexualText(name, originalName)) return true
+        if (keywordIds.any { isBlockedKeywordId(it) }) {
+            addDerivedBlockedTv(id)
+            return true
+        }
         if (companyIds.any { isBlockedCompanyId(it) }) {
             addDerivedBlockedTv(id)
             return true
@@ -318,11 +371,7 @@ object ContentFilter {
 
     // === DISCOVER PARAMS HELPER ===
     fun discoverParams(): DiscoverFilterParams {
-        val current = _blocklist.value
-        val defaultKeywordList = BLOCKED_KEYWORD_IDS.split(",")
-            .mapNotNull { it.trim().toIntOrNull() }
-            .toSet()
-        val allKeywords = defaultKeywordList + current.keywords
+        val allKeywords = getAllBlockedKeywordIds()
         val withoutKeywordsStr = if (allKeywords.isNotEmpty()) {
             allKeywords.joinToString(",")
         } else null

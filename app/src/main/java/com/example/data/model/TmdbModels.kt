@@ -86,6 +86,16 @@ data class TmdbExternalIds(
 )
 
 @JsonClass(generateAdapter = true)
+data class TmdbMovieKeywordsContainer(
+    @Json(name = "keywords") val keywords: List<TmdbKeyword>? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class TmdbTvKeywordsContainer(
+    @Json(name = "results") val results: List<TmdbKeyword>? = null
+)
+
+@JsonClass(generateAdapter = true)
 data class TmdbMovieDetail(
     @Json(name = "id") val id: Int,
     @Json(name = "title") val title: String? = null,
@@ -105,6 +115,7 @@ data class TmdbMovieDetail(
     @Json(name = "external_ids") val externalIds: TmdbExternalIds? = null,
     @Json(name = "videos") val videos: TmdbVideoContainer? = null,
     @Json(name = "credits") val credits: TmdbCredits? = null,
+    @Json(name = "keywords") val keywordsContainer: TmdbMovieKeywordsContainer? = null,
     @Json(name = "similar") val similar: TmdbPagedResponse<TmdbMovie>? = null,
     @Json(name = "adult") val adult: Boolean = false
 ) {
@@ -147,6 +158,7 @@ data class TmdbTvDetail(
     @Json(name = "seasons") val seasons: List<TmdbSeasonSummary>? = null,
     @Json(name = "videos") val videos: TmdbVideoContainer? = null,
     @Json(name = "credits") val credits: TmdbCredits? = null,
+    @Json(name = "keywords") val keywordsContainer: TmdbTvKeywordsContainer? = null,
     @Json(name = "similar") val similar: TmdbPagedResponse<TmdbTv>? = null,
     @Json(name = "adult") val adult: Boolean = false
 ) {
