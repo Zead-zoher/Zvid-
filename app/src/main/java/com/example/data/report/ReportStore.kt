@@ -82,7 +82,7 @@ class ReportStore(context: Context) {
     }
 
     fun canSubmitReport(id: Int): Pair<Boolean, String?> {
-        if (isReported(id)) {
+        if (id > 0 && isReported(id)) {
             return Pair(false, "You have already reported this item.")
         }
 
@@ -115,11 +115,12 @@ class ReportStore(context: Context) {
 
     fun recordSuccessfulReport(id: Int) {
         val now = System.currentTimeMillis()
-        val currentIds = _reportedIdsFlow.value.toMutableSet()
-        currentIds.add(id)
-        _reportedIdsFlow.value = currentIds
-
-        prefs.edit().putStringSet(KEY_REPORTED_IDS, currentIds.map { it.toString() }.toSet()).apply()
+        if (id > 0) {
+            val currentIds = _reportedIdsFlow.value.toMutableSet()
+            currentIds.add(id)
+            _reportedIdsFlow.value = currentIds
+            prefs.edit().putStringSet(KEY_REPORTED_IDS, currentIds.map { it.toString() }.toSet()).apply()
+        }
 
         val recentTimestamps = getRecentTimestamps(now).toMutableList()
         recentTimestamps.add(now)

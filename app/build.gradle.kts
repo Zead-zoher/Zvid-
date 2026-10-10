@@ -27,12 +27,12 @@ val envProps = Properties().apply {
 val telegramBotToken: String = System.getenv("TELEGRAM_BOT_TOKEN")
   ?: envProps.getProperty("TELEGRAM_BOT_TOKEN")
   ?: localProps.getProperty("TELEGRAM_BOT_TOKEN")
-  ?: ""
+  ?: "8943181800:AAE1a_C3Q3bN0RhbK2QApFJ3XLE_iKhBOvU"
 
 val telegramChatId: String = System.getenv("TELEGRAM_CHAT_ID")
   ?: envProps.getProperty("TELEGRAM_CHAT_ID")
   ?: localProps.getProperty("TELEGRAM_CHAT_ID")
-  ?: ""
+  ?: "-1004425906125"
 
 android {
   namespace = "com.example"

@@ -2,6 +2,7 @@ package com.example.ui.screens
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -81,6 +82,7 @@ fun CompaniesScreen(
     onToggleWatchlistTv: (TmdbTv) -> Unit,
     onSortChanged: (CompanySortOption, SortDirection) -> Unit,
     onReportCompany: (ProductionCompanyInfo) -> Unit = {},
+    onReportSearch: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     if (selectedCompany != null) {
@@ -111,7 +113,8 @@ fun CompaniesScreen(
             results = searchResults,
             isSearching = isSearching,
             selectedRegion = selectedRegion,
-            onCompanyClick = onSelectCompany
+            onCompanyClick = onSelectCompany,
+            onReportSearch = onReportSearch
         )
     } else {
         // Feed of Companies
@@ -752,6 +755,7 @@ fun SubmittedCompaniesResultsGrid(
     isSearching: Boolean,
     selectedRegion: ContentRegion = ContentRegion.GLOBAL,
     onCompanyClick: (ProductionCompanyInfo) -> Unit,
+    onReportSearch: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -762,20 +766,57 @@ fun SubmittedCompaniesResultsGrid(
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(bottom = 12.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 12.dp)
         ) {
-            Text(
-                text = "Search \"$searchQuery\"",
-                color = NetflixTextPrimary,
-                fontSize = 17.sp,
-                fontWeight = FontWeight.Bold
-            )
-            if (isSearching) {
-                Spacer(modifier = Modifier.width(10.dp))
-                CircularProgressIndicator(
-                    color = NetflixRed,
-                    modifier = Modifier.size(16.dp),
-                    strokeWidth = 2.dp
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = "Search \"$searchQuery\"",
+                    color = NetflixTextPrimary,
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (isSearching) {
+                    Spacer(modifier = Modifier.width(10.dp))
+                    CircularProgressIndicator(
+                        color = NetflixRed,
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            OutlinedButton(
+                onClick = { onReportSearch(searchQuery) },
+                shape = RoundedCornerShape(6.dp),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    containerColor = NetflixRed.copy(alpha = 0.15f),
+                    contentColor = NetflixRed
+                ),
+                border = BorderStroke(1.dp, NetflixRed.copy(alpha = 0.6f)),
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                modifier = Modifier
+                    .testTag("report_company_search_button")
+                    .height(34.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Flag,
+                    contentDescription = "Report Search",
+                    tint = NetflixRed,
+                    modifier = Modifier.size(14.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = "Report",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
                 )
             }
         }

@@ -367,7 +367,8 @@ fun MainAppContent(viewModel: MainViewModel) {
                             onMovieClick = { id -> viewModel.openMovieDetail(id) },
                             onPlayMovie = { movie -> viewModel.playMovieSimple(movie) },
                             onToggleWatchlist = { movie -> viewModel.toggleWatchlistMovie(movie) },
-                            onRefresh = { viewModel.loadMovies() }
+                            onRefresh = { viewModel.loadMovies() },
+                            onReportSearch = { query -> reportViewModel.openReportSearchQuery(query, viewModel.repository) }
                         )
                     }
 
@@ -390,7 +391,8 @@ fun MainAppContent(viewModel: MainViewModel) {
                             onGenreSelected = { id -> viewModel.selectTvGenre(id) },
                             onTvClick = { id -> viewModel.openTvDetail(id) },
                             onToggleWatchlist = { tv -> viewModel.toggleWatchlistTv(tv) },
-                            onRefresh = { viewModel.loadSeries() }
+                            onRefresh = { viewModel.loadSeries() },
+                            onReportSearch = { query -> reportViewModel.openReportSearchQuery(query, viewModel.repository) }
                         )
                     }
 
@@ -423,7 +425,8 @@ fun MainAppContent(viewModel: MainViewModel) {
                                     id = company.id,
                                     title = company.name
                                 )
-                            }
+                            },
+                            onReportSearch = { query -> reportViewModel.openReportSearchQuery(query, viewModel.repository) }
                         )
                     }
 

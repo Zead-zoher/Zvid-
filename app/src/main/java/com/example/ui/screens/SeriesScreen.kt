@@ -54,6 +54,7 @@ fun SeriesScreen(
     onTvClick: (Int) -> Unit,
     onToggleWatchlist: (TmdbTv) -> Unit,
     onRefresh: () -> Unit,
+    onReportSearch: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val isSaved = { id: Int -> watchlist.any { it.id == id } }
@@ -79,7 +80,8 @@ fun SeriesScreen(
                 isSearching = isSearching,
                 isSaved = isSaved,
                 onTvClick = onTvClick,
-                onToggleWatchlist = onToggleWatchlist
+                onToggleWatchlist = onToggleWatchlist,
+                onReportSearch = onReportSearch
             )
             return
         }

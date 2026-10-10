@@ -87,20 +87,24 @@ fun ReportDialog(
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
                         Text(
-                            text = "TYPE: ${item.type.key.uppercase()}",
+                            text = "TYPE: ${item.type.key.replace('_', ' ').uppercase()}",
                             color = NetflixTextMuted,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.SemiBold
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = item.title,
+                            text = if (item.type == com.example.data.report.ReportTargetType.SearchKeyword) "\"${item.title}\"" else item.title,
                             color = NetflixTextPrimary,
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Medium
                         )
                         Text(
-                            text = "ID: ${item.id}",
+                            text = if (item.type == com.example.data.report.ReportTargetType.SearchKeyword) {
+                                if (item.id > 0) "Keyword ID: ${item.id}" else "Keyword ID: None (Search query)"
+                            } else {
+                                "ID: ${item.id}"
+                            },
                             color = NetflixTextSecondary,
                             fontSize = 12.sp
                         )

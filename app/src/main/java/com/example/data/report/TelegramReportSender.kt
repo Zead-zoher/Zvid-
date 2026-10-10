@@ -37,13 +37,27 @@ class TelegramReportSender(
         }
 
         val reasonText = if (item.reason.trim().isBlank()) "none" else item.reason.trim().take(300)
-        val linkUrl = "https://www.themoviedb.org/${item.type.tmdbPath}/${item.id}"
+        val linkUrl = if (item.type == ReportTargetType.SearchKeyword) {
+            if (item.id > 0) "https://www.themoviedb.org/keyword/${item.id}"
+            else "https://www.themoviedb.org/search/keyword?query=${java.net.URLEncoder.encode(item.title, "UTF-8")}"
+        } else {
+            "https://www.themoviedb.org/${item.type.tmdbPath}/${item.id}"
+        }
 
         val messageText = buildString {
             appendLine("New report")
             appendLine("Type: ${item.type.key}")
-            appendLine("ID: ${item.id}")
-            appendLine("Title: ${item.title}")
+            if (item.type == ReportTargetType.SearchKeyword) {
+                appendLine("Search Word: ${item.title}")
+                if (item.id > 0) {
+                    appendLine("Keyword ID: ${item.id}")
+                } else {
+                    appendLine("Keyword ID: None / Not found on TMDB")
+                }
+            } else {
+                appendLine("ID: ${item.id}")
+                appendLine("Title: ${item.title}")
+            }
             appendLine("Link: $linkUrl")
             appendLine("Reason: $reasonText")
             append("App version: $appVersion")

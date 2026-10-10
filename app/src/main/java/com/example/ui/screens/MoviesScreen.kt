@@ -58,6 +58,7 @@ fun MoviesScreen(
     onPlayMovie: (TmdbMovie) -> Unit,
     onToggleWatchlist: (TmdbMovie) -> Unit,
     onRefresh: () -> Unit,
+    onReportSearch: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val isSaved = { id: Int -> watchlist.any { it.id == id } }
@@ -84,7 +85,8 @@ fun MoviesScreen(
                 isSaved = isSaved,
                 onMovieClick = onMovieClick,
                 onPlayMovie = onPlayMovie,
-                onToggleWatchlist = onToggleWatchlist
+                onToggleWatchlist = onToggleWatchlist,
+                onReportSearch = onReportSearch
             )
             return
         }

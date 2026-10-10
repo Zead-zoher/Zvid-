@@ -47,6 +47,45 @@ class ReportViewModel(application: Application) : AndroidViewModel(application) 
         _activeReportItem.value = ReportItem(type = type, id = id, title = title)
     }
 
+    fun openReportSearchQuery(query: String, repository: com.example.data.repository.MediaRepository) {
+        val trimmed = query.trim()
+        if (trimmed.isBlank()) return
+
+        val antiSpamId = if (trimmed.hashCode() == 0) 1 else kotlin.math.abs(trimmed.hashCode())
+        val (canReport, abuseReason) = reportStore.canSubmitReport(antiSpamId)
+        if (!canReport) {
+            viewModelScope.launch {
+                _snackbarEvent.emit(abuseReason ?: "Cannot report this search term")
+            }
+            return
+        }
+
+        viewModelScope.launch {
+            _isSending.value = true
+            val keywords = repository.searchKeywords(trimmed)
+            _isSending.value = false
+
+            val exactMatch = keywords.firstOrNull { it.name.equals(trimmed, ignoreCase = true) }
+            val matchedKeyword = exactMatch ?: keywords.firstOrNull()
+            val keywordId = matchedKeyword?.id ?: 0
+
+            val defaultReason = if (keywords.isNotEmpty()) {
+                val matches = keywords.take(4).joinToString { "#${it.id} (${it.name})" }
+                "Matching TMDB Keywords: $matches"
+            } else {
+                "Search term: \"$trimmed\""
+            }
+
+            _reportReason.value = ""
+            _activeReportItem.value = ReportItem(
+                type = ReportTargetType.SearchKeyword,
+                id = keywordId,
+                title = trimmed,
+                reason = defaultReason
+            )
+        }
+    }
+
     fun closeReportDialog() {
         _activeReportItem.value = null
         _reportReason.value = ""

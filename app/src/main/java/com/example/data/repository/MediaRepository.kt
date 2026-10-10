@@ -997,4 +997,14 @@ class MediaRepository(
             resolveAndBlockWorksForCompany(companyId)
         }
     }
+
+    suspend fun searchKeywords(query: String): List<com.example.data.model.TmdbKeyword> = withContext(Dispatchers.IO) {
+        val trimmed = query.trim()
+        if (trimmed.isBlank()) return@withContext emptyList()
+        try {
+            api.searchKeywords(trimmed, page = 1).results
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
 }

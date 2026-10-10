@@ -3,6 +3,7 @@ package com.example.ui.components
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -13,6 +14,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.SearchOff
 import androidx.compose.material.icons.filled.Star
@@ -341,6 +343,7 @@ fun SubmittedMovieResultsGrid(
     onMovieClick: (Int) -> Unit,
     onPlayMovie: (TmdbMovie) -> Unit,
     onToggleWatchlist: (TmdbMovie) -> Unit,
+    onReportSearch: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -353,20 +356,57 @@ fun SubmittedMovieResultsGrid(
         // Heading
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(bottom = 12.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 12.dp)
         ) {
-            Text(
-                text = "Search \"$searchQuery\"",
-                color = NetflixTextPrimary,
-                fontSize = 17.sp,
-                fontWeight = FontWeight.Bold
-            )
-            if (isSearching) {
-                Spacer(modifier = Modifier.width(10.dp))
-                CircularProgressIndicator(
-                    color = NetflixRed,
-                    modifier = Modifier.size(16.dp),
-                    strokeWidth = 2.dp
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = "Search \"$searchQuery\"",
+                    color = NetflixTextPrimary,
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (isSearching) {
+                    Spacer(modifier = Modifier.width(10.dp))
+                    CircularProgressIndicator(
+                        color = NetflixRed,
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            OutlinedButton(
+                onClick = { onReportSearch(searchQuery) },
+                shape = RoundedCornerShape(6.dp),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    containerColor = NetflixRed.copy(alpha = 0.15f),
+                    contentColor = NetflixRed
+                ),
+                border = BorderStroke(1.dp, NetflixRed.copy(alpha = 0.6f)),
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                modifier = Modifier
+                    .testTag("report_movie_search_button")
+                    .height(34.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Flag,
+                    contentDescription = "Report Search",
+                    tint = NetflixRed,
+                    modifier = Modifier.size(14.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = "Report",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
                 )
             }
         }
@@ -433,6 +473,7 @@ fun SubmittedTvResultsGrid(
     isSaved: (Int) -> Boolean,
     onTvClick: (Int) -> Unit,
     onToggleWatchlist: (TmdbTv) -> Unit,
+    onReportSearch: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -445,20 +486,57 @@ fun SubmittedTvResultsGrid(
         // Heading
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(bottom = 12.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 12.dp)
         ) {
-            Text(
-                text = "Search \"$searchQuery\"",
-                color = NetflixTextPrimary,
-                fontSize = 17.sp,
-                fontWeight = FontWeight.Bold
-            )
-            if (isSearching) {
-                Spacer(modifier = Modifier.width(10.dp))
-                CircularProgressIndicator(
-                    color = NetflixRed,
-                    modifier = Modifier.size(16.dp),
-                    strokeWidth = 2.dp
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = "Search \"$searchQuery\"",
+                    color = NetflixTextPrimary,
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (isSearching) {
+                    Spacer(modifier = Modifier.width(10.dp))
+                    CircularProgressIndicator(
+                        color = NetflixRed,
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            OutlinedButton(
+                onClick = { onReportSearch(searchQuery) },
+                shape = RoundedCornerShape(6.dp),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    containerColor = NetflixRed.copy(alpha = 0.15f),
+                    contentColor = NetflixRed
+                ),
+                border = BorderStroke(1.dp, NetflixRed.copy(alpha = 0.6f)),
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                modifier = Modifier
+                    .testTag("report_tv_search_button")
+                    .height(34.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Flag,
+                    contentDescription = "Report Search",
+                    tint = NetflixRed,
+                    modifier = Modifier.size(14.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = "Report",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
                 )
             }
         }

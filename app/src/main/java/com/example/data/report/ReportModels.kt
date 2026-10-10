@@ -5,6 +5,7 @@ sealed class ReportTargetType(val key: String, val tmdbPath: String) {
     object Tv : ReportTargetType("tv", "tv")
     object Company : ReportTargetType("company", "company")
     object Person : ReportTargetType("person", "person")
+    object SearchKeyword : ReportTargetType("search_keyword", "keyword")
 }
 
 data class ReportItem(
