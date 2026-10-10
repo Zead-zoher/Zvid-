@@ -112,7 +112,7 @@ gradle assembleDebug
 
 3. **إعداد مفتاح TMDB API**:
 التطبيق يعمل مباشرة بمفتاح تجريبي مدمج. للاستخدام الشخصي بدون حدود، احصل على مفتاحك الخاص:
-
+**[شاهد فيديو](https://youtu.be/TpMQAV3_HwU)**
    - **كيفية الحصول على المفتاح**:
      1. أنشئ حساباً مجانياً على [The Movie Database (TMDB)](https://www.themoviedb.org/).
      2. اضغط على صورة حسابك ثم Settings.
