@@ -98,7 +98,7 @@ gradle assembleDebug
 
 3. **Configure TMDB API Key**:
 The app runs instantly using a pre-configured demo key. For unlimited personal usage, obtain your own TMDB API Key:
-
+**[Watch video](https://youtu.be/TpMQAV3_HwU)**
   - **How to get the API Key**:
     1. Create a free account on [The Movie Database (TMDB)](https://www.themoviedb.org/).
     2. Click your profile picture, then go to **Settings**.
