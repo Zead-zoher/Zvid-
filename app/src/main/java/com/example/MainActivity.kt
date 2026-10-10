@@ -30,6 +30,7 @@ import com.example.ui.modals.ReportDialog
 import com.example.ui.modals.ResolutionOverlayModal
 import com.example.ui.modals.StreamOptionDialog
 import com.example.ui.modals.UnavailableContentDialog
+import com.example.ui.modals.UpdateAvailableDialog
 import com.example.ui.player.PlayerScreen
 import com.example.ui.screens.CompaniesScreen
 import com.example.ui.screens.MoviesScreen
@@ -61,6 +62,12 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun MainAppContent(viewModel: MainViewModel) {
+    val reportViewModel: ReportViewModel = viewModel()
+    val activeReportItem by reportViewModel.activeReportItem.collectAsStateWithLifecycle()
+    val reportReason by reportViewModel.reportReason.collectAsStateWithLifecycle()
+    val isReportSending by reportViewModel.isSending.collectAsStateWithLifecycle()
+    val isDetailUnavailable by viewModel.isDetailUnavailable.collectAsStateWithLifecycle()
+
     val currentTab by viewModel.currentTab.collectAsStateWithLifecycle()
     val selectedContentRegion by viewModel.selectedContentRegion.collectAsStateWithLifecycle()
 
@@ -149,6 +156,7 @@ fun MainAppContent(viewModel: MainViewModel) {
     val isSearchingPeople by viewModel.isSearchingPeople.collectAsStateWithLifecycle()
     val selectedPerson by viewModel.selectedPerson.collectAsStateWithLifecycle()
     val isLoadingPerson by viewModel.isLoadingPerson.collectAsStateWithLifecycle()
+    val availableUpdate by viewModel.availableUpdate.collectAsStateWithLifecycle()
 
     // Smart BackHandler navigation: return to suggestions / close search / dismiss modals before exiting
     val isMovieSearching = currentTab == AppTab.MOVIES && (isMovieSearchSubmitted || movieSearchQuery.isNotEmpty())
@@ -214,6 +222,12 @@ fun MainAppContent(viewModel: MainViewModel) {
 
     LaunchedEffect(Unit) {
         viewModel.userMessage.collectLatest { msg ->
+            snackbarHostState.showSnackbar(msg)
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        reportViewModel.snackbarEvent.collectLatest { msg ->
             snackbarHostState.showSnackbar(msg)
         }
     }
@@ -402,7 +416,14 @@ fun MainAppContent(viewModel: MainViewModel) {
                             onPlayMovie = { movie -> viewModel.playMovieSimple(movie) },
                             onToggleWatchlistMovie = { movie -> viewModel.toggleWatchlistMovie(movie) },
                             onToggleWatchlistTv = { tv -> viewModel.toggleWatchlistTv(tv) },
-                            onSortChanged = { option, dir -> viewModel.updateCompanySort(option, dir) }
+                            onSortChanged = { option, dir -> viewModel.updateCompanySort(option, dir) },
+                            onReportCompany = { company ->
+                                reportViewModel.openReportDialog(
+                                    type = ReportTargetType.Company,
+                                    id = company.id,
+                                    title = company.name
+                                )
+                            }
                         )
                     }
 
@@ -451,6 +472,13 @@ fun MainAppContent(viewModel: MainViewModel) {
                 onPlayMovie = { movie -> viewModel.playMovieSimple(movie) },
                 onToggleWatchlistMovie = { movie -> viewModel.toggleWatchlistMovie(movie) },
                 onToggleWatchlistTv = { tv -> viewModel.toggleWatchlistTv(tv) },
+                onReportPerson = { person ->
+                    reportViewModel.openReportDialog(
+                        type = ReportTargetType.Person,
+                        id = person.id,
+                        title = person.name
+                    )
+                },
                 onDismiss = { viewModel.closePeopleDialog() }
             )
         }
@@ -470,6 +498,20 @@ fun MainAppContent(viewModel: MainViewModel) {
                 onPlayEpisode = { tvDetail, sNum, ep -> viewModel.playTvEpisode(tvDetail, sNum, ep) },
                 onToggleWatchlistMovie = { movie -> viewModel.toggleWatchlistMovieDetail(movie) },
                 onToggleWatchlistTv = { tv -> viewModel.toggleWatchlistTvDetail(tv) },
+                onReportMovie = { movie ->
+                    reportViewModel.openReportDialog(
+                        type = ReportTargetType.Movie,
+                        id = movie.id,
+                        title = movie.displayTitle
+                    )
+                },
+                onReportTv = { tv ->
+                    reportViewModel.openReportDialog(
+                        type = ReportTargetType.Tv,
+                        id = tv.id,
+                        title = tv.displayTitle
+                    )
+                },
                 onCompanyClick = { companyId, name -> viewModel.openCompanyById(companyId, name) },
                 onPersonClick = { personId -> viewModel.selectPerson(personId) },
                 onDismiss = { viewModel.closeDetailModal() }
@@ -486,6 +528,10 @@ fun MainAppContent(viewModel: MainViewModel) {
             onKeyInputChanged = { newKey -> viewModel.updateApiKeyInput(newKey) },
             onSaveKey = { key -> viewModel.saveAndValidateApiKey(key) },
             onUseDemoKey = { viewModel.useDemoKey() },
+            reportStore = reportViewModel.reportStore,
+            onTestTelegram = { token, chatId, callback ->
+                reportViewModel.testTelegramConfig(token, chatId, callback)
+            },
             onDismiss = { viewModel.closeSettings() }
         )
 
@@ -538,5 +584,31 @@ fun MainAppContent(viewModel: MainViewModel) {
                 }
             )
         }
+
+        // In-App Report Dialog (Telegram reporting)
+        if (activeReportItem != null) {
+            ReportDialog(
+                item = activeReportItem,
+                reason = reportReason,
+                isSending = isReportSending,
+                onReasonChange = { text -> reportViewModel.onReasonChanged(text) },
+                onSubmit = {
+                    reportViewModel.submitReport()
+                },
+                onDismiss = { reportViewModel.closeReportDialog() }
+            )
+        }
+
+        // Unavailable Content Dialog (When opening blocked or reported content)
+        UnavailableContentDialog(
+            isOpen = isDetailUnavailable,
+            onDismiss = { viewModel.dismissUnavailable() }
+        )
+
+        // App Update Dialog (from GitHub version.json)
+        UpdateAvailableDialog(
+            updateInfo = availableUpdate,
+            onDismiss = { viewModel.dismissUpdateDialog() }
+        )
     }
 }

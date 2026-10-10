@@ -53,26 +53,22 @@ class RemoteBlocklist(private val context: Context) {
 
     suspend fun initialize() = withContext(Dispatchers.IO) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val lastFetchTime = prefs.getLong(KEY_LAST_FETCH, 0L)
         val now = System.currentTimeMillis()
-        val shouldFetchRemote = (now - lastFetchTime) > SIX_HOURS_MS || lastFetchTime == 0L
 
         var parsedBlocklist: Blocklist? = null
 
-        // 1. Fresh download if 6 hours elapsed
-        if (shouldFetchRemote) {
-            val remoteJson = downloadRemoteJson()
-            if (!remoteJson.isNullOrBlank()) {
-                val parsed = parseJson(remoteJson)
-                if (parsed != null) {
-                    saveToDiskCache(remoteJson)
-                    prefs.edit().putLong(KEY_LAST_FETCH, now).apply()
-                    parsedBlocklist = parsed.toBlocklist()
-                }
+        // 1. Fresh download from GitHub repository (Always attempt first to ensure latest updates)
+        val remoteJson = downloadRemoteJson()
+        if (!remoteJson.isNullOrBlank()) {
+            val parsed = parseJson(remoteJson)
+            if (parsed != null) {
+                saveToDiskCache(remoteJson)
+                prefs.edit().putLong(KEY_LAST_FETCH, now).apply()
+                parsedBlocklist = parsed.toBlocklist()
             }
         }
 
-        // 2. If no fresh download, try disk cache
+        // 2. If remote download failed (e.g. offline), try disk cache
         if (parsedBlocklist == null) {
             val cachedJson = loadFromDiskCache()
             if (!cachedJson.isNullOrBlank()) {
@@ -88,7 +84,7 @@ class RemoteBlocklist(private val context: Context) {
             }
         }
 
-        // 4. Fallback to built-in sets only if all failed
+        // 4. Update ContentFilter with final blocklist
         val finalBlocklist = parsedBlocklist ?: Blocklist()
         ContentFilter.updateBlocklist(finalBlocklist)
     }

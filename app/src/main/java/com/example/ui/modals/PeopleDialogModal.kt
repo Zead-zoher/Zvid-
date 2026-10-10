@@ -502,6 +502,35 @@ fun PersonDetailView(
                 }
             }
 
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Long Report Person Button below the two buttons (Movies & TV Shows)
+            OutlinedButton(
+                onClick = onReport,
+                shape = RoundedCornerShape(8.dp),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = Color.White.copy(alpha = 0.8f)
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(44.dp)
+                    .testTag("detail_report_person_btn")
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Flag,
+                    contentDescription = null,
+                    tint = NetflixRed,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Report Person",
+                    color = Color.White,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+
             Spacer(modifier = Modifier.height(14.dp))
         }
 

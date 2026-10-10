@@ -395,6 +395,35 @@ fun MovieDetailContent(
                     )
                 }
 
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Long Report Button below Watchlist
+                OutlinedButton(
+                    onClick = onReportClick,
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = Color.White.copy(alpha = 0.8f)
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(44.dp)
+                        .testTag("detail_report_movie_btn")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Flag,
+                        contentDescription = null,
+                        tint = NetflixRed,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Report Content",
+                        color = Color.White,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+
                 Spacer(modifier = Modifier.height(18.dp))
 
                 // Genres tags
@@ -756,6 +785,35 @@ fun TvDetailContent(
                         color = if (isSaved) NetflixRed else Color.White,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.SemiBold
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Long Report Button below Watchlist
+                OutlinedButton(
+                    onClick = onReportClick,
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = Color.White.copy(alpha = 0.8f)
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(44.dp)
+                        .testTag("detail_report_tv_btn")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Flag,
+                        contentDescription = null,
+                        tint = NetflixRed,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Report Content",
+                        color = Color.White,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium
                     )
                 }
 

@@ -29,11 +29,11 @@ class TelegramReportSender(
             }
         }
 
-        val token = BuildConfig.TELEGRAM_BOT_TOKEN.trim()
-        val chatId = BuildConfig.TELEGRAM_CHAT_ID.trim()
+        val token = reportStore.getTelegramBotToken()
+        val chatId = reportStore.getTelegramChatId()
 
         if (token.isBlank() || chatId.isBlank()) {
-            return@withContext ReportResult.Error("Reporting is not configured")
+            return@withContext ReportResult.Error("Reporting is not configured (Bot Token or Chat ID is missing)")
         }
 
         val reasonText = if (item.reason.trim().isBlank()) "none" else item.reason.trim().take(300)
@@ -64,14 +64,15 @@ class TelegramReportSender(
             val response = client.newCall(request).execute()
             response.use {
                 if (it.isSuccessful) {
-                    reportStore.recordSuccessfulReport(item.id)
+                    reportStore.recordSuccessfulReport(item)
                     ReportResult.Success
                 } else {
-                    ReportResult.Error("Failed to deliver report (HTTP ${it.code})")
+                    val errorDetail = it.body?.string()?.take(150) ?: ""
+                    ReportResult.Error("Telegram error (HTTP ${it.code}): ${if (errorDetail.isNotBlank()) errorDetail else "check Bot Token & Chat ID"}")
                 }
             }
         } catch (e: Exception) {
-            ReportResult.Error("Connection error while sending report")
+            ReportResult.Error("Connection error while sending report: ${e.message ?: "network failure"}")
         }
     }
 }

@@ -39,24 +39,24 @@ class MediaRepository(
 ) {
     private val api get() = TmdbApiClient.getApi(apiKeyStore)
 
-    // Helper to filter movies with both built-in content filter and user-reported IDs
+    // Helper to filter movies with content filter
     fun filterMoviesWithReports(list: List<TmdbMovie>): List<TmdbMovie> {
-        return ContentFilter.filterMovies(list).filter { !reportStore.isReported(it.id) }
+        return ContentFilter.filterMovies(list)
     }
 
-    // Helper to filter TV with both built-in content filter and user-reported IDs
+    // Helper to filter TV with content filter
     fun filterTvWithReports(list: List<TmdbTv>): List<TmdbTv> {
-        return ContentFilter.filterTv(list).filter { !reportStore.isReported(it.id) }
+        return ContentFilter.filterTv(list)
     }
 
-    // Helper to filter people with both built-in content filter and user-reported IDs
+    // Helper to filter people with content filter
     fun filterPeopleWithReports(list: List<TmdbPerson>): List<TmdbPerson> {
-        return ContentFilter.filterPeople(list).filter { !reportStore.isReported(it.id) }
+        return ContentFilter.filterPeople(list)
     }
 
-    // Helper to filter companies with both built-in content filter and user-reported IDs
+    // Helper to filter companies with content filter
     fun filterCompaniesWithReports(list: List<ProductionCompanyInfo>): List<ProductionCompanyInfo> {
-        return ContentFilter.filterCompanies(list).filter { !reportStore.isReported(it.id) }
+        return ContentFilter.filterCompanies(list)
     }
 
     // Pagination helper: if filtered list has fewer than 10 items and more pages exist,
@@ -306,10 +306,15 @@ class MediaRepository(
     ): Result<TmdbMovieDetail> = withContext(Dispatchers.IO) {
         try {
             val detail = api.getMovieDetails(movieId, language = region.languageCode)
-            val filteredSimilar = detail.similar?.let { sim ->
-                sim.copy(results = filterMoviesWithReports(sim.results))
+            if (ContentFilter.isBlockedMovie(detail)) {
+                ContentFilter.addDerivedBlockedMovie(detail.id)
+                Result.failure(Exception("Movie is blocked"))
+            } else {
+                val filteredSimilar = detail.similar?.let { sim ->
+                    sim.copy(results = filterMoviesWithReports(sim.results))
+                }
+                Result.success(detail.copy(similar = filteredSimilar))
             }
-            Result.success(detail.copy(similar = filteredSimilar))
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -509,10 +514,15 @@ class MediaRepository(
     ): Result<TmdbTvDetail> = withContext(Dispatchers.IO) {
         try {
             val detail = api.getTvDetails(tvId, language = region.languageCode)
-            val filteredSimilar = detail.similar?.let { sim ->
-                sim.copy(results = filterTvWithReports(sim.results))
+            if (ContentFilter.isBlockedTv(detail)) {
+                ContentFilter.addDerivedBlockedTv(detail.id)
+                Result.failure(Exception("Series is blocked"))
+            } else {
+                val filteredSimilar = detail.similar?.let { sim ->
+                    sim.copy(results = filterTvWithReports(sim.results))
+                }
+                Result.success(detail.copy(similar = filteredSimilar))
             }
-            Result.success(detail.copy(similar = filteredSimilar))
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -921,16 +931,70 @@ class MediaRepository(
         try {
             val lang = if (region == ContentRegion.ARABIC) "ar-SA" else region.languageCode
             val detail = api.getPersonDetails(personId, language = lang)
-            // Filter person's credits, but keep person visible unless person is adult or blocked
-            val filteredMovieCredits = detail.movieCredits?.let { mc ->
-                mc.copy(cast = filterMoviesWithReports(mc.cast))
+            if (ContentFilter.isBlockedPerson(detail)) {
+                // If person is blocked, all their works are blocked as well
+                val movieIds = detail.movieCredits?.cast?.map { it.id } ?: emptyList()
+                val tvIds = detail.tvCredits?.cast?.map { it.id } ?: emptyList()
+                ContentFilter.addDerivedBlockedWorks(movieIds, tvIds)
+                Result.failure(Exception("Person is blocked"))
+            } else {
+                val filteredMovieCredits = detail.movieCredits?.let { mc ->
+                    mc.copy(cast = filterMoviesWithReports(mc.cast))
+                }
+                val filteredTvCredits = detail.tvCredits?.let { tc ->
+                    tc.copy(cast = filterTvWithReports(tc.cast))
+                }
+                Result.success(detail.copy(movieCredits = filteredMovieCredits, tvCredits = filteredTvCredits))
             }
-            val filteredTvCredits = detail.tvCredits?.let { tc ->
-                tc.copy(cast = filterTvWithReports(tc.cast))
-            }
-            Result.success(detail.copy(movieCredits = filteredMovieCredits, tvCredits = filteredTvCredits))
         } catch (e: Exception) {
             Result.failure(e)
+        }
+    }
+
+    // === RESOLVE AND BLOCK WORKS FOR PEOPLE & COMPANIES ===
+    suspend fun resolveAndBlockWorksForPerson(personId: Int) = withContext(Dispatchers.IO) {
+        try {
+            val detail = api.getPersonDetails(personId, appendToResponse = "movie_credits,tv_credits")
+            val movieIds = detail.movieCredits?.cast?.map { it.id } ?: emptyList()
+            val tvIds = detail.tvCredits?.cast?.map { it.id } ?: emptyList()
+            ContentFilter.addDerivedBlockedWorks(movieIds, tvIds)
+        } catch (_: Exception) {}
+    }
+
+    suspend fun resolveAndBlockWorksForCompany(companyId: Int) = withContext(Dispatchers.IO) {
+        try {
+            val movieIds = mutableListOf<Int>()
+            val tvIds = mutableListOf<Int>()
+            for (p in 1..5) {
+                val moviesRes = try {
+                    api.discoverMovies(withCompanies = companyId.toString(), page = p)
+                } catch (_: Exception) { null }
+                if (moviesRes != null) {
+                    movieIds.addAll(moviesRes.results.map { it.id })
+                    if (p >= moviesRes.totalPages) break
+                } else break
+            }
+            for (p in 1..5) {
+                val tvRes = try {
+                    api.discoverTv(withCompanies = companyId.toString(), page = p)
+                } catch (_: Exception) { null }
+                if (tvRes != null) {
+                    tvIds.addAll(tvRes.results.map { it.id })
+                    if (p >= tvRes.totalPages) break
+                } else break
+            }
+            ContentFilter.addDerivedBlockedWorks(movieIds, tvIds)
+        } catch (_: Exception) {}
+    }
+
+    suspend fun syncAllBlockedWorks() = withContext(Dispatchers.IO) {
+        val people = ContentFilter.getAllBlockedPeopleIds()
+        for (personId in people) {
+            resolveAndBlockWorksForPerson(personId)
+        }
+        val companies = ContentFilter.getAllBlockedCompanyIds()
+        for (companyId in companies) {
+            resolveAndBlockWorksForCompany(companyId)
         }
     }
 }

@@ -17,12 +17,21 @@ val localProps = Properties().apply {
   }
 }
 
-val telegramBotToken: String = localProps.getProperty("TELEGRAM_BOT_TOKEN")
-  ?: System.getenv("TELEGRAM_BOT_TOKEN")
+val envProps = Properties().apply {
+  val envFile = rootProject.file(".env")
+  if (envFile.exists()) {
+    FileInputStream(envFile).use { load(it) }
+  }
+}
+
+val telegramBotToken: String = System.getenv("TELEGRAM_BOT_TOKEN")
+  ?: envProps.getProperty("TELEGRAM_BOT_TOKEN")
+  ?: localProps.getProperty("TELEGRAM_BOT_TOKEN")
   ?: ""
 
-val telegramChatId: String = localProps.getProperty("TELEGRAM_CHAT_ID")
-  ?: System.getenv("TELEGRAM_CHAT_ID")
+val telegramChatId: String = System.getenv("TELEGRAM_CHAT_ID")
+  ?: envProps.getProperty("TELEGRAM_CHAT_ID")
+  ?: localProps.getProperty("TELEGRAM_CHAT_ID")
   ?: ""
 
 android {

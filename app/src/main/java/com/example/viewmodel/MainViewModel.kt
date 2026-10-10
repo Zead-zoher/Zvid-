@@ -20,7 +20,9 @@ import com.example.data.model.TmdbPersonDetail
 import com.example.data.model.TmdbSeasonDetail
 import com.example.data.model.TmdbTv
 import com.example.data.model.TmdbTvDetail
+import com.example.data.report.ReportItem
 import com.example.data.report.ReportStore
+import com.example.data.report.ReportTargetType
 import com.example.data.repository.MediaRepository
 import com.example.ui.screens.CompanySortOption
 import com.example.ui.screens.SortDirection
@@ -76,6 +78,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val apiKeyStore = ApiKeyStore(application)
     val reportStore = ReportStore(application)
     val remoteBlocklist = RemoteBlocklist(application)
+    val updateChecker = com.example.data.update.AppUpdateChecker(application)
     val searchHistoryStore = com.example.data.local.SearchHistoryStore(application)
     private val database = ZvidDatabase.getDatabase(application)
     val repository = MediaRepository(
@@ -86,6 +89,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         reportStore = reportStore
     )
 
+    private val _availableUpdate = MutableStateFlow<com.example.data.update.AppUpdateInfo?>(null)
+    val availableUpdate: StateFlow<com.example.data.update.AppUpdateInfo?> = _availableUpdate.asStateFlow()
+
+    fun dismissUpdateDialog() {
+        _availableUpdate.value = null
+    }
+
     private val _isDetailUnavailable = MutableStateFlow(false)
     val isDetailUnavailable: StateFlow<Boolean> = _isDetailUnavailable.asStateFlow()
 
@@ -93,23 +103,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _isDetailUnavailable.value = false
     }
 
+    fun onItemReported(item: ReportItem) {
+        // Report was sent to Telegram. Content is not blocked locally until added to GitHub blocklist.
+    }
+
     fun onItemReported(id: Int) {
-        if (_activeMovieDetail.value?.id == id) {
-            closeDetailModal()
-        }
-        if (_activeTvDetail.value?.id == id) {
-            closeDetailModal()
-        }
-        if (_selectedCompany.value?.id == id) {
-            closeCompanyDetail()
-        }
-        if (_selectedPerson.value?.id == id) {
-            closePersonDetail()
-        }
-        loadMovies()
-        loadSeries()
-        loadCompaniesForRegion()
-        loadPopularPeople()
+        // No-op locally
     }
 
     private val _playbackDestination = MutableStateFlow(PlaybackDestination.NONE)
@@ -380,7 +379,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun selectCompany(company: ProductionCompanyInfo) {
         closeDetailModal()
         closePeopleDialog()
-        if (ContentFilter.isBlockedCompany(company) || reportStore.isReported(company.id)) {
+        if (ContentFilter.isBlockedCompany(company)) {
             _selectedCompany.value = null
             _isDetailUnavailable.value = true
             return
@@ -394,7 +393,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun openCompanyById(companyId: Int, companyName: String = "") {
         closeDetailModal()
         closePeopleDialog()
-        if (ContentFilter.isBlockedCompany(companyId, companyName) || reportStore.isReported(companyId)) {
+        if (ContentFilter.isBlockedCompany(companyId, companyName)) {
             _selectedCompany.value = null
             _isDetailUnavailable.value = true
             return
@@ -407,7 +406,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 id = companyId,
                 name = companyName.ifBlank { "Production Company" }
             )
-            if (ContentFilter.isBlockedCompany(info) || reportStore.isReported(info.id)) {
+            if (ContentFilter.isBlockedCompany(info)) {
                 _selectedCompany.value = null
                 _isDetailUnavailable.value = true
             } else {
@@ -534,17 +533,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun selectPerson(personId: Int) {
-        if (reportStore.isReported(personId)) {
-            _selectedPerson.value = null
-            _isDetailUnavailable.value = true
-            return
-        }
         _isPeopleDialogOpen.value = true
         viewModelScope.launch {
             _isLoadingPerson.value = true
             val res = repository.getPersonDetails(personId, _selectedContentRegion.value)
             val detail = res.getOrNull()
-            if (detail != null && (ContentFilter.isBlockedPerson(detail) || reportStore.isReported(detail.id))) {
+            if (detail != null && ContentFilter.isBlockedPerson(detail)) {
                 _selectedPerson.value = null
                 _isPeopleDialogOpen.value = false
                 _isDetailUnavailable.value = true
@@ -591,6 +585,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     init {
         viewModelScope.launch {
             remoteBlocklist.initialize()
+            repository.syncAllBlockedWorks()
+            loadMovies()
+            loadSeries()
+            loadCompaniesForRegion()
+            loadPopularPeople()
+            // Check for newer version on GitHub in background
+            val updateInfo = updateChecker.checkForUpdate()
+            if (updateInfo != null) {
+                _availableUpdate.value = updateInfo
+            }
         }
         viewModelScope.launch {
             ContentFilter.blocklist.collect {
@@ -616,10 +620,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
         }
-        loadMovies()
-        loadSeries()
-        loadCompaniesForRegion()
-        loadPopularPeople()
+        viewModelScope.launch {
+            ContentFilter.derivedBlockedMovieIds.collect { derivedIds ->
+                val currentMovie = _activeMovieDetail.value
+                if (currentMovie != null && (derivedIds.contains(currentMovie.id) || ContentFilter.isBlockedMovie(currentMovie))) {
+                    _activeMovieDetail.value = null
+                    _isDetailUnavailable.value = true
+                }
+            }
+        }
+        viewModelScope.launch {
+            ContentFilter.derivedBlockedTvIds.collect { derivedIds ->
+                val currentTv = _activeTvDetail.value
+                if (currentTv != null && (derivedIds.contains(currentTv.id) || ContentFilter.isBlockedTv(currentTv))) {
+                    _activeTvDetail.value = null
+                    _isDetailUnavailable.value = true
+                }
+            }
+        }
     }
 
     fun setTab(tab: AppTab) {
@@ -903,18 +921,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     // === DETAILS MODAL ACTIONS ===
     fun openMovieDetail(movieId: Int) {
-        if (reportStore.isReported(movieId)) {
-            _activeMovieDetail.value = null
-            _isDetailUnavailable.value = true
-            return
-        }
         viewModelScope.launch {
             _isLoadingDetail.value = true
             _activeTvDetail.value = null
             val res = repository.getMovieDetails(movieId, _selectedContentRegion.value)
             if (res.isSuccess) {
                 val detail = res.getOrNull()
-                if (detail != null && (ContentFilter.isBlockedMovie(detail) || reportStore.isReported(detail.id))) {
+                if (detail != null && ContentFilter.isBlockedMovie(detail)) {
                     _activeMovieDetail.value = null
                     _isDetailUnavailable.value = true
                 } else {
@@ -928,11 +941,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun openTvDetail(tvId: Int) {
-        if (reportStore.isReported(tvId)) {
-            _activeTvDetail.value = null
-            _isDetailUnavailable.value = true
-            return
-        }
         viewModelScope.launch {
             _isLoadingDetail.value = true
             _activeMovieDetail.value = null
@@ -941,7 +949,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val res = repository.getTvDetails(tvId, _selectedContentRegion.value)
             if (res.isSuccess) {
                 val tvDetail = res.getOrNull()
-                if (tvDetail != null && (ContentFilter.isBlockedTv(tvDetail) || reportStore.isReported(tvDetail.id))) {
+                if (tvDetail != null && ContentFilter.isBlockedTv(tvDetail)) {
                     _activeTvDetail.value = null
                     _isDetailUnavailable.value = true
                 } else {
