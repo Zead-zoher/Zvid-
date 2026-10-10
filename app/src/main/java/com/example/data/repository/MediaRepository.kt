@@ -963,7 +963,7 @@ class MediaRepository(
         try {
             val movieIds = mutableListOf<Int>()
             val tvIds = mutableListOf<Int>()
-            for (p in 1..5) {
+            for (p in 1..2) {
                 val moviesRes = try {
                     api.discoverMovies(withKeywords = keywordId.toString(), page = p)
                 } catch (_: Exception) { null }
@@ -972,7 +972,7 @@ class MediaRepository(
                     if (p >= moviesRes.totalPages) break
                 } else break
             }
-            for (p in 1..5) {
+            for (p in 1..2) {
                 val tvRes = try {
                     api.discoverTv(withKeywords = keywordId.toString(), page = p)
                 } catch (_: Exception) { null }

@@ -32,6 +32,7 @@ import com.example.player.EmbedStreamResolver
 import com.example.player.EmbeddedHttpServer
 import com.example.player.ResolvedStream
 import com.example.player.StreamResolver
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -585,11 +586,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     init {
         viewModelScope.launch {
             remoteBlocklist.initialize()
-            repository.syncAllBlockedWorks()
+            // Load content immediately for instantaneous startup
             loadMovies()
             loadSeries()
             loadCompaniesForRegion()
             loadPopularPeople()
+
+            // Run deep blocked works sync in the background without blocking the UI
+            launch(Dispatchers.IO) {
+                repository.syncAllBlockedWorks()
+            }
+
             // Check for newer version on GitHub in background
             val updateInfo = updateChecker.checkForUpdate()
             if (updateInfo != null) {
