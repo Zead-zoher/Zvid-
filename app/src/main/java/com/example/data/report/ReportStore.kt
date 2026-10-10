@@ -16,6 +16,8 @@ class ReportStore(context: Context) {
         private const val KEY_REPORT_TIMESTAMPS = "report_timestamps_csv"
         private const val KEY_CUSTOM_BOT_TOKEN = "custom_telegram_bot_token"
         private const val KEY_CUSTOM_CHAT_ID = "custom_telegram_chat_id"
+        private const val DEFAULT_BOT_TOKEN = "8943181800:AAE1a_C3Q3bN0RhbK2QApFJ3XLE_iKhBOvU"
+        private const val DEFAULT_CHAT_ID = "-1004425906125"
         private val ONE_HOUR_MS = TimeUnit.HOURS.toMillis(1)
         private const val MAX_REPORTS_PER_HOUR = 5
     }
@@ -55,13 +57,17 @@ class ReportStore(context: Context) {
     fun getTelegramBotToken(): String {
         val custom = prefs.getString(KEY_CUSTOM_BOT_TOKEN, null)?.trim()
         if (!custom.isNullOrBlank()) return custom
-        return com.example.BuildConfig.TELEGRAM_BOT_TOKEN.trim()
+        val buildConfigToken = com.example.BuildConfig.TELEGRAM_BOT_TOKEN.trim()
+        if (buildConfigToken.isNotBlank()) return buildConfigToken
+        return DEFAULT_BOT_TOKEN
     }
 
     fun getTelegramChatId(): String {
         val custom = prefs.getString(KEY_CUSTOM_CHAT_ID, null)?.trim()
         if (!custom.isNullOrBlank()) return custom
-        return com.example.BuildConfig.TELEGRAM_CHAT_ID.trim()
+        val buildConfigChatId = com.example.BuildConfig.TELEGRAM_CHAT_ID.trim()
+        if (buildConfigChatId.isNotBlank()) return buildConfigChatId
+        return DEFAULT_CHAT_ID
     }
 
     fun isTelegramConfigured(): Boolean {
