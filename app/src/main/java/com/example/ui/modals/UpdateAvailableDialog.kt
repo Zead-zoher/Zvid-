@@ -113,7 +113,7 @@ fun UpdateAvailableDialog(
                                 fontSize = 13.sp
                             )
                             Text(
-                                text = "Latest: v${updateInfo.versionName}",
+                                text = "Latest: v${updateInfo.effectiveVersionString}",
                                 color = NetflixRed,
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold
@@ -134,7 +134,7 @@ fun UpdateAvailableDialog(
             Button(
                 onClick = {
                     try {
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(updateInfo.downloadUrl)).apply {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(updateInfo.effectiveDownloadUrl)).apply {
                             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                         }
                         context.startActivity(intent)

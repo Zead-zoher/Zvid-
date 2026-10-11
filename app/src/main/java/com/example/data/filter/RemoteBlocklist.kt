@@ -30,8 +30,11 @@ class RemoteBlocklist(private val context: Context) {
 
         var parsedBlocklist: Blocklist? = null
 
-        // 1. Fresh download from GitHub repository (Always attempt first to ensure latest updates)
-        val remoteJson = downloadRemoteJson(BLOCKLIST_URL) ?: downloadRemoteJson(FALLBACK_BLOCKLIST_URL)
+        // 1. Fresh download from GitHub repository with cache busting on every app launch
+        val timestamp = System.currentTimeMillis()
+        val primaryUrl = "$BLOCKLIST_URL?t=$timestamp"
+        val fallbackUrl = "$FALLBACK_BLOCKLIST_URL?t=$timestamp"
+        val remoteJson = downloadRemoteJson(primaryUrl) ?: downloadRemoteJson(fallbackUrl)
         if (!remoteJson.isNullOrBlank()) {
             val parsed = parseJson(remoteJson)
             if (parsed != null) {
@@ -67,7 +70,8 @@ class RemoteBlocklist(private val context: Context) {
             val request = Request.Builder()
                 .url(url)
                 .header("Accept", "application/json")
-                .header("Cache-Control", "no-cache")
+                .header("Cache-Control", "no-cache, no-store, must-revalidate")
+                .header("Pragma", "no-cache")
                 .build()
 
             httpClient.newCall(request).execute().use { response ->
@@ -146,6 +150,7 @@ class RemoteBlocklist(private val context: Context) {
             val keywords = mutableSetOf<Int>()
             val words = mutableSetOf<String>()
 
+            // 1. Process "keywords" array (handles both numeric IDs and text words)
             root.optJSONArray("keywords")?.let { arr ->
                 for (i in 0 until arr.length()) {
                     val item = arr.opt(i)
@@ -166,13 +171,43 @@ class RemoteBlocklist(private val context: Context) {
                 }
             }
 
-            // Also check for optional explicit blocked_words or words list
-            val wordsArr = root.optJSONArray("blocked_words") ?: root.optJSONArray("words")
-            wordsArr?.let { arr ->
+            // 2. Process "words" array
+            root.optJSONArray("words")?.let { arr ->
                 for (i in 0 until arr.length()) {
                     val str = arr.optString(i)
                     if (!str.isNullOrBlank()) {
                         words.add(str.trim())
+                    }
+                }
+            }
+
+            // 3. Process "blocked_words" array
+            root.optJSONArray("blocked_words")?.let { arr ->
+                for (i in 0 until arr.length()) {
+                    val str = arr.optString(i)
+                    if (!str.isNullOrBlank()) {
+                        words.add(str.trim())
+                    }
+                }
+            }
+
+            // 4. Process "blocked_keywords" array
+            root.optJSONArray("blocked_keywords")?.let { arr ->
+                for (i in 0 until arr.length()) {
+                    val item = arr.opt(i)
+                    when (item) {
+                        is Number -> {
+                            val id = item.toInt()
+                            if (id > 0) keywords.add(id)
+                        }
+                        is String -> {
+                            val intVal = item.toIntOrNull()
+                            if (intVal != null && intVal > 0) {
+                                keywords.add(intVal)
+                            } else if (item.isNotBlank()) {
+                                words.add(item.trim())
+                            }
+                        }
                     }
                 }
             }
@@ -190,4 +225,3 @@ class RemoteBlocklist(private val context: Context) {
         }
     }
 }
-

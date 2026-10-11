@@ -9,6 +9,7 @@ import com.example.data.model.TmdbPersonDetail
 import com.example.data.model.TmdbProductionCompany
 import com.example.data.model.TmdbTv
 import com.example.data.model.TmdbTvDetail
+import com.example.util.ArabicSearchHelper
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -31,17 +32,23 @@ data class DiscoverFilterParams(
 object ContentFilter {
 
     // Comma-separated TMDB keyword IDs for sexual keywords only - easily editable
-    // 596 = sex, 190370 = sex scene, 9951 = hentai, 191630 = ecchi, 155477 = erotic,
-    // 9799 = romantic / sexual themes, 235777 = pornography, 222243 = softcore, 158718 = explicit sex
-    const val BLOCKED_KEYWORD_IDS: String = "596,190370,9951,191630,155477,9799,235777,222243,158718"
+    const val BLOCKED_KEYWORD_IDS: String = "596,190370,9951,191630,155477,9799,235777,222243,158718,33494,4217,368159,333072,353663,336330,264386,363345,378893,33451"
 
-    // Built-in sets
-    val BUILT_IN_MOVIES: Set<Int> = emptySet()
-    val BUILT_IN_TV: Set<Int> = emptySet()
-    val BUILT_IN_COMPANIES: Set<Int> = emptySet()
-    val BUILT_IN_PEOPLE: Set<Int> = emptySet()
-    val BUILT_IN_KEYWORDS: Set<Int> = emptySet()
-    val BUILT_IN_WORDS: Set<String> = emptySet()
+    // Built-in sets matching official blocklist
+    val BUILT_IN_MOVIES: Set<Int> = setOf(941071)
+    val BUILT_IN_TV: Set<Int> = setOf(95897, 325655)
+    val BUILT_IN_COMPANIES: Set<Int> = setOf(80856)
+    val BUILT_IN_PEOPLE: Set<Int> = setOf(3961517, 3164807, 166081, 1721615, 240615, 1134569, 553597)
+    val BUILT_IN_KEYWORDS: Set<Int> = setOf(
+        596, 190370, 9951, 191630, 155477, 9799, 235777, 222243, 158718, 33494, 4217,
+        368159, 333072, 353663, 336330, 264386, 363345, 378893, 33451
+    )
+    val BUILT_IN_WORDS: Set<String> = setOf(
+        "sex", "sexy", "sexual", "sexuality", "hentai", "xxx", "porn", "porno",
+        "pornography", "erotic", "erotica", "ecchi", "softcore", "explicit sex",
+        "incest", "سكس", "إباحي", "اباحي", "إباحية", "اباحية", "بورنو", "هينتاي",
+        "جنسي", "جنسيه", "جنسية"
+    )
 
     private val initialBlocklist = Blocklist(
         movies = BUILT_IN_MOVIES,
@@ -63,15 +70,12 @@ object ContentFilter {
     val derivedBlockedTvIds: StateFlow<Set<Int>> = _derivedBlockedTvIds.asStateFlow()
 
     // Regex matching sexual / hentai / erotic / sex terms.
-    // Explicitly filters out words like 'sex', 'sexy', 'sexual', 'hentai', 'xxx', 'porn', etc.
-    // Preserves action, crime, war, violence, thriller, horror, blood, etc.
-    // Does not falsely match place names like 'Essex', 'Middlesex', 'Sussex'
     private val SEXUAL_WORD_REGEX = Regex(
-        """(?i)(^|[^a-zA-Z0-9])(sex|sexy|sexual|sexuality|hentai|xxx|porn|porno|pornography|erotic|erotica|ecchi)($|[^a-zA-Z0-9])"""
+        """(?i)(^|[^a-zA-Z0-9])(sex|sexy|sexual|sexuality|hentai|xxx|porn|porno|pornography|erotic|erotica|ecchi|softcore|hardcore|nudity|nude)($|[^a-zA-Z0-9])"""
     )
 
     private val ARABIC_SEXUAL_REGEX = Regex(
-        """(سكس|إباحي|اباحي|إباحية|اباحية|بورنو|هينتاي|جنسي)"""
+        """(سكس|إباحي|اباحي|إباحية|اباحية|بورنو|هينتاي|جنسي|جنسيه|جنسية|مثير|شذوذ|لواط|عري|عاري)"""
     )
 
     fun updateBlocklist(remoteBlocklist: Blocklist) {
@@ -133,7 +137,44 @@ object ContentFilter {
         _derivedBlockedTvIds.value = _derivedBlockedTvIds.value + tvId
     }
 
-    fun matchesSexualText(vararg texts: String?): Boolean {
+    private fun normalizeArabic(text: String): String {
+        return text.replace(Regex("[\\u064B-\\u065F\\u0670\\u0640]"), "") // Tashkeel and tatweel
+            .replace(Regex("[أإآٱ]"), "ا")
+            .replace("ة", "ه")
+            .replace("ى", "ي")
+            .trim()
+    }
+
+    fun containsBlockedWord(text: String, word: String): Boolean {
+        val trimmedText = text.trim()
+        val trimmedWord = word.trim()
+        if (trimmedText.isBlank() || trimmedWord.isBlank()) return false
+
+        // 1. Arabic matching with normalization
+        if (ArabicSearchHelper.isArabic(trimmedWord) || ArabicSearchHelper.isArabic(trimmedText)) {
+            val normText = normalizeArabic(trimmedText)
+            val normWord = normalizeArabic(trimmedWord)
+            if (normWord.isNotBlank() && normText.contains(normWord)) {
+                return true
+            }
+        }
+
+        // 2. English / Latin matching
+        if (trimmedWord.contains(" ")) {
+            if (trimmedText.contains(trimmedWord, ignoreCase = true)) {
+                return true
+            }
+        } else {
+            val pattern = Regex("""(?i)(^|[^a-zA-Z0-9])${Regex.escape(trimmedWord)}($|[^a-zA-Z0-9])""")
+            if (pattern.containsMatchIn(trimmedText) || trimmedText.equals(trimmedWord, ignoreCase = true)) {
+                return true
+            }
+        }
+
+        return false
+    }
+
+    fun matchesBlockedText(vararg texts: String?): Boolean {
         val customWords = _blocklist.value.words
         for (text in texts) {
             if (!text.isNullOrBlank()) {
@@ -142,7 +183,7 @@ object ContentFilter {
                     return true
                 }
                 for (w in customWords) {
-                    if (w.isNotBlank() && trimmed.contains(w, ignoreCase = true)) {
+                    if (w.isNotBlank() && containsBlockedWord(trimmed, w)) {
                         return true
                     }
                 }
@@ -151,8 +192,20 @@ object ContentFilter {
         return false
     }
 
+    // Keep alias for backwards compatibility
+    fun matchesSexualText(vararg texts: String?): Boolean = matchesBlockedText(*texts)
+
     fun isBlockedSearchQuery(query: String): Boolean {
-        return matchesSexualText(query)
+        if (query.isBlank()) return false
+        val trimmed = query.trim()
+        if (matchesBlockedText(trimmed)) return true
+        val customWords = _blocklist.value.words
+        for (w in customWords) {
+            if (w.isNotBlank() && containsBlockedWord(trimmed, w)) {
+                return true
+            }
+        }
+        return false
     }
 
     // === MOVIE CHECKS ===
@@ -161,7 +214,7 @@ object ContentFilter {
         val current = _blocklist.value
         if (current.movies.contains(movie.id)) return true
         if (_derivedBlockedMovieIds.value.contains(movie.id)) return true
-        if (matchesSexualText(movie.title, movie.originalTitle, movie.overview)) return true
+        if (matchesBlockedText(movie.title, movie.originalTitle, movie.overview)) return true
         return false
     }
 
@@ -170,11 +223,11 @@ object ContentFilter {
         val current = _blocklist.value
         if (current.movies.contains(movieDetail.id)) return true
         if (_derivedBlockedMovieIds.value.contains(movieDetail.id)) return true
-        if (matchesSexualText(movieDetail.title, movieDetail.originalTitle, movieDetail.overview, movieDetail.tagline)) return true
+        if (matchesBlockedText(movieDetail.title, movieDetail.originalTitle, movieDetail.overview, movieDetail.tagline)) return true
 
         // Check if any keyword in this movie is blocked
         val kwList = movieDetail.keywordsContainer?.keywords
-        if (kwList != null && kwList.any { isBlockedKeywordId(it.id) || matchesSexualText(it.name) }) {
+        if (kwList != null && kwList.any { isBlockedKeywordId(it.id) || matchesBlockedText(it.name) }) {
             addDerivedBlockedMovie(movieDetail.id)
             return true
         }
@@ -209,7 +262,7 @@ object ContentFilter {
         val current = _blocklist.value
         if (current.movies.contains(id)) return true
         if (_derivedBlockedMovieIds.value.contains(id)) return true
-        if (matchesSexualText(title, originalTitle)) return true
+        if (matchesBlockedText(title, originalTitle)) return true
         if (keywordIds.any { isBlockedKeywordId(it) }) {
             addDerivedBlockedMovie(id)
             return true
@@ -231,7 +284,7 @@ object ContentFilter {
         val current = _blocklist.value
         if (current.tv.contains(tv.id)) return true
         if (_derivedBlockedTvIds.value.contains(tv.id)) return true
-        if (matchesSexualText(tv.name, tv.originalName, tv.overview)) return true
+        if (matchesBlockedText(tv.name, tv.originalName, tv.overview)) return true
         return false
     }
 
@@ -240,11 +293,11 @@ object ContentFilter {
         val current = _blocklist.value
         if (current.tv.contains(tvDetail.id)) return true
         if (_derivedBlockedTvIds.value.contains(tvDetail.id)) return true
-        if (matchesSexualText(tvDetail.name, tvDetail.originalName, tvDetail.overview, tvDetail.tagline)) return true
+        if (matchesBlockedText(tvDetail.name, tvDetail.originalName, tvDetail.overview, tvDetail.tagline)) return true
 
         // Check if any keyword in this TV show is blocked
         val kwList = tvDetail.keywordsContainer?.results
-        if (kwList != null && kwList.any { isBlockedKeywordId(it.id) || matchesSexualText(it.name) }) {
+        if (kwList != null && kwList.any { isBlockedKeywordId(it.id) || matchesBlockedText(it.name) }) {
             addDerivedBlockedTv(tvDetail.id)
             return true
         }
@@ -279,7 +332,7 @@ object ContentFilter {
         val current = _blocklist.value
         if (current.tv.contains(id)) return true
         if (_derivedBlockedTvIds.value.contains(id)) return true
-        if (matchesSexualText(name, originalName)) return true
+        if (matchesBlockedText(name, originalName)) return true
         if (keywordIds.any { isBlockedKeywordId(it) }) {
             addDerivedBlockedTv(id)
             return true
@@ -299,14 +352,14 @@ object ContentFilter {
     fun isBlockedPerson(person: TmdbPerson): Boolean {
         if (person.adult) return true
         if (isBlockedPersonId(person.id)) return true
-        if (matchesSexualText(person.name, person.originalName)) return true
+        if (matchesBlockedText(person.name, person.originalName)) return true
         return false
     }
 
     fun isBlockedPerson(personDetail: TmdbPersonDetail): Boolean {
         if (personDetail.adult) return true
         if (isBlockedPersonId(personDetail.id)) return true
-        if (matchesSexualText(personDetail.name)) return true
+        if (matchesBlockedText(personDetail.name)) return true
         return false
     }
 
@@ -314,21 +367,21 @@ object ContentFilter {
     fun isBlockedCompany(company: TmdbProductionCompany): Boolean {
         if (company.adult) return true
         if (isBlockedCompanyId(company.id)) return true
-        if (matchesSexualText(company.name)) return true
+        if (matchesBlockedText(company.name)) return true
         return false
     }
 
     fun isBlockedCompany(company: ProductionCompanyInfo): Boolean {
         if (company.adult) return true
         if (isBlockedCompanyId(company.id)) return true
-        if (matchesSexualText(company.name, company.arabicName)) return true
+        if (matchesBlockedText(company.name, company.arabicName)) return true
         return false
     }
 
     fun isBlockedCompany(companyId: Int, companyName: String = "", adult: Boolean = false): Boolean {
         if (adult) return true
         if (isBlockedCompanyId(companyId)) return true
-        if (matchesSexualText(companyName)) return true
+        if (matchesBlockedText(companyName)) return true
         return false
     }
 
@@ -359,7 +412,7 @@ object ContentFilter {
         val derivedTv = _derivedBlockedTvIds.value
         return list.filter { item ->
             if (item.adult) return@filter false
-            if (matchesSexualText(item.title, item.name)) return@filter false
+            if (matchesBlockedText(item.title, item.name)) return@filter false
             val isTv = item.mediaType == "tv"
             if (isTv) {
                 !current.tv.contains(item.id) && !derivedTv.contains(item.id)

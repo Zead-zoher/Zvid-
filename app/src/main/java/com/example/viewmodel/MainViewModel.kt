@@ -90,6 +90,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         reportStore = reportStore
     )
 
+    fun refreshRemoteData() {
+        viewModelScope.launch {
+            remoteBlocklist.initialize()
+            val updateInfo = updateChecker.checkForUpdate()
+            if (updateInfo != null) {
+                _availableUpdate.value = updateInfo
+            }
+        }
+    }
+
     private val _availableUpdate = MutableStateFlow<com.example.data.update.AppUpdateInfo?>(null)
     val availableUpdate: StateFlow<com.example.data.update.AppUpdateInfo?> = _availableUpdate.asStateFlow()
 
@@ -605,6 +615,30 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
         viewModelScope.launch {
             ContentFilter.blocklist.collect {
+                // Re-filter currently displayed movies and series
+                _trendingMovies.value = ContentFilter.filterMovies(_trendingMovies.value)
+                _popularMovies.value = ContentFilter.filterMovies(_popularMovies.value)
+                _topRatedMovies.value = ContentFilter.filterMovies(_topRatedMovies.value)
+                _genreMovies.value = ContentFilter.filterMovies(_genreMovies.value)
+                _movieSearchResults.value = ContentFilter.filterMovies(_movieSearchResults.value)
+                _movieSuggestions.value = ContentFilter.filterMovies(_movieSuggestions.value)
+
+                _trendingTv.value = ContentFilter.filterTv(_trendingTv.value)
+                _popularTv.value = ContentFilter.filterTv(_popularTv.value)
+                _newReleaseTv.value = ContentFilter.filterTv(_newReleaseTv.value)
+                _genreTv.value = ContentFilter.filterTv(_genreTv.value)
+                _tvSearchResults.value = ContentFilter.filterTv(_tvSearchResults.value)
+                _tvSuggestions.value = ContentFilter.filterTv(_tvSuggestions.value)
+
+                val heroM = _heroMovie.value
+                if (heroM != null && ContentFilter.isBlockedMovie(heroM)) {
+                    _heroMovie.value = _trendingMovies.value.firstOrNull { it.backdropPath != null } ?: _trendingMovies.value.firstOrNull()
+                }
+                val heroT = _heroTv.value
+                if (heroT != null && ContentFilter.isBlockedTv(heroT)) {
+                    _heroTv.value = _trendingTv.value.firstOrNull { it.backdropPath != null } ?: _trendingTv.value.firstOrNull()
+                }
+
                 val currentMovie = _activeMovieDetail.value
                 if (currentMovie != null && ContentFilter.isBlockedMovie(currentMovie)) {
                     _activeMovieDetail.value = null
@@ -629,6 +663,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
         viewModelScope.launch {
             ContentFilter.derivedBlockedMovieIds.collect { derivedIds ->
+                _trendingMovies.value = ContentFilter.filterMovies(_trendingMovies.value)
+                _popularMovies.value = ContentFilter.filterMovies(_popularMovies.value)
+                _topRatedMovies.value = ContentFilter.filterMovies(_topRatedMovies.value)
+                _movieSearchResults.value = ContentFilter.filterMovies(_movieSearchResults.value)
+                _movieSuggestions.value = ContentFilter.filterMovies(_movieSuggestions.value)
+
                 val currentMovie = _activeMovieDetail.value
                 if (currentMovie != null && (derivedIds.contains(currentMovie.id) || ContentFilter.isBlockedMovie(currentMovie))) {
                     _activeMovieDetail.value = null
@@ -638,6 +678,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
         viewModelScope.launch {
             ContentFilter.derivedBlockedTvIds.collect { derivedIds ->
+                _trendingTv.value = ContentFilter.filterTv(_trendingTv.value)
+                _popularTv.value = ContentFilter.filterTv(_popularTv.value)
+                _newReleaseTv.value = ContentFilter.filterTv(_newReleaseTv.value)
+                _tvSearchResults.value = ContentFilter.filterTv(_tvSearchResults.value)
+                _tvSuggestions.value = ContentFilter.filterTv(_tvSuggestions.value)
+
                 val currentTv = _activeTvDetail.value
                 if (currentTv != null && (derivedIds.contains(currentTv.id) || ContentFilter.isBlockedTv(currentTv))) {
                     _activeTvDetail.value = null
@@ -800,7 +846,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _movieSearchQuery.value = query
         _isMovieSearchSubmitted.value = false
         movieSearchJob?.cancel()
-        if (query.isBlank()) {
+        if (query.isBlank() || ContentFilter.isBlockedSearchQuery(query)) {
             _movieSuggestions.value = emptyList()
             _movieSearchResults.value = emptyList()
             _isSearchingMovies.value = false
@@ -821,7 +867,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun submitMovieSearch() {
         val query = _movieSearchQuery.value.trim()
-        if (query.isNotBlank()) {
+        if (query.isNotBlank() && !ContentFilter.isBlockedSearchQuery(query)) {
             _isMovieSearchSubmitted.value = true
             addMovieSearchQueryToHistory(query)
             viewModelScope.launch {
@@ -830,6 +876,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _movieSearchResults.value = results.getOrDefault(emptyList())
                 _isSearchingMovies.value = false
             }
+        } else {
+            _movieSearchResults.value = emptyList()
+            _movieSuggestions.value = emptyList()
+            _isSearchingMovies.value = false
         }
     }
 
@@ -886,7 +936,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _tvSearchQuery.value = query
         _isTvSearchSubmitted.value = false
         tvSearchJob?.cancel()
-        if (query.isBlank()) {
+        if (query.isBlank() || ContentFilter.isBlockedSearchQuery(query)) {
             _tvSuggestions.value = emptyList()
             _tvSearchResults.value = emptyList()
             _isSearchingTv.value = false
@@ -906,7 +956,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun submitTvSearch() {
         val query = _tvSearchQuery.value.trim()
-        if (query.isNotBlank()) {
+        if (query.isNotBlank() && !ContentFilter.isBlockedSearchQuery(query)) {
             _isTvSearchSubmitted.value = true
             addTvSearchQueryToHistory(query)
             viewModelScope.launch {
@@ -915,6 +965,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _tvSearchResults.value = results.getOrDefault(emptyList())
                 _isSearchingTv.value = false
             }
+        } else {
+            _tvSearchResults.value = emptyList()
+            _tvSuggestions.value = emptyList()
+            _isSearchingTv.value = false
         }
     }
 
@@ -928,6 +982,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     // === DETAILS MODAL ACTIONS ===
     fun openMovieDetail(movieId: Int) {
+        if (ContentFilter.blocklist.value.movies.contains(movieId) || ContentFilter.derivedBlockedMovieIds.value.contains(movieId)) {
+            _activeMovieDetail.value = null
+            _isDetailUnavailable.value = true
+            return
+        }
         viewModelScope.launch {
             _isLoadingDetail.value = true
             _activeTvDetail.value = null
@@ -948,6 +1007,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun openTvDetail(tvId: Int) {
+        if (ContentFilter.blocklist.value.tv.contains(tvId) || ContentFilter.derivedBlockedTvIds.value.contains(tvId)) {
+            _activeTvDetail.value = null
+            _isDetailUnavailable.value = true
+            return
+        }
         viewModelScope.launch {
             _isLoadingDetail.value = true
             _activeMovieDetail.value = null
