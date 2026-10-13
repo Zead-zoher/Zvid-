@@ -34,6 +34,7 @@ import com.example.viewmodel.AppTab
 @Composable
 fun RecentScreen(
     historyList: List<RecentHistoryEntity>,
+    onItemClick: (RecentHistoryEntity) -> Unit = {},
     onResumePlayback: (RecentHistoryEntity) -> Unit,
     onDeleteItem: (String) -> Unit,
     onClearAllHistory: () -> Unit,
@@ -200,6 +201,7 @@ fun RecentScreen(
                     items(historyList, key = { it.historyId }) { item ->
                         RecentHistoryCard(
                             item = item,
+                            onOpenDetail = { onItemClick(item) },
                             onResume = { onResumePlayback(item) },
                             onDelete = { onDeleteItem(item.historyId) }
                         )
@@ -213,6 +215,7 @@ fun RecentScreen(
 @Composable
 fun RecentHistoryCard(
     item: RecentHistoryEntity,
+    onOpenDetail: () -> Unit,
     onResume: () -> Unit,
     onDelete: () -> Unit
 ) {
@@ -225,7 +228,7 @@ fun RecentHistoryCard(
         color = NetflixCardElevated,
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onResume)
+            .clickable(onClick = onOpenDetail)
             .testTag("history_card_${item.mediaId}")
     ) {
         Row(
@@ -234,13 +237,14 @@ fun RecentHistoryCard(
                 .padding(10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Poster Thumbnail with Play Icon
+            // Poster Thumbnail with Play Icon (clicking plays directly)
             Box(
                 modifier = Modifier
                     .width(65.dp)
                     .aspectRatio(16f / 11f)
                     .clip(RoundedCornerShape(6.dp))
                     .background(NetflixSurfaceVariant)
+                    .clickable(onClick = onResume)
             ) {
                 if (posterUrl != null) {
                     AsyncImage(

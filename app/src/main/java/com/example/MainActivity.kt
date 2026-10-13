@@ -7,17 +7,40 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupProperties
+import androidx.compose.ui.zIndex
+import kotlinx.coroutines.delay
+import android.widget.Toast
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.data.report.ReportTargetType
@@ -72,6 +95,8 @@ fun MainAppContent(viewModel: MainViewModel) {
     val reportReason by reportViewModel.reportReason.collectAsStateWithLifecycle()
     val isReportSending by reportViewModel.isSending.collectAsStateWithLifecycle()
     val isDetailUnavailable by viewModel.isDetailUnavailable.collectAsStateWithLifecycle()
+    val isInitializingContent by viewModel.isInitializingContent.collectAsStateWithLifecycle()
+    val isOfflineError by viewModel.isOfflineError.collectAsStateWithLifecycle()
 
     val currentTab by viewModel.currentTab.collectAsStateWithLifecycle()
     val selectedContentRegion by viewModel.selectedContentRegion.collectAsStateWithLifecycle()
@@ -161,6 +186,8 @@ fun MainAppContent(viewModel: MainViewModel) {
     val isSearchingPeople by viewModel.isSearchingPeople.collectAsStateWithLifecycle()
     val selectedPerson by viewModel.selectedPerson.collectAsStateWithLifecycle()
     val isLoadingPerson by viewModel.isLoadingPerson.collectAsStateWithLifecycle()
+    val savedPersonIds by viewModel.savedPersonIds.collectAsStateWithLifecycle()
+    val savedPeople by viewModel.savedPeopleList.collectAsStateWithLifecycle()
     val availableUpdate by viewModel.availableUpdate.collectAsStateWithLifecycle()
 
     // Smart BackHandler navigation: return to suggestions / close search / dismiss modals before exiting
@@ -224,16 +251,33 @@ fun MainAppContent(viewModel: MainViewModel) {
     }
 
     val snackbarHostState = remember { SnackbarHostState() }
+    val context = LocalContext.current
+    var topToastMessage by remember { androidx.compose.runtime.mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
         viewModel.userMessage.collectLatest { msg ->
+            topToastMessage = msg
+            try {
+                Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+            } catch (_: Exception) {}
             snackbarHostState.showSnackbar(msg)
         }
     }
 
     LaunchedEffect(Unit) {
         reportViewModel.snackbarEvent.collectLatest { msg ->
+            topToastMessage = msg
+            try {
+                Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+            } catch (_: Exception) {}
             snackbarHostState.showSnackbar(msg)
+        }
+    }
+
+    LaunchedEffect(topToastMessage) {
+        if (topToastMessage != null) {
+            delay(3200)
+            topToastMessage = null
         }
     }
 
@@ -251,7 +295,6 @@ fun MainAppContent(viewModel: MainViewModel) {
             .background(NetflixBlack)
     ) {
         Scaffold(
-            snackbarHost = { SnackbarHost(snackbarHostState) },
             containerColor = NetflixBlack,
             topBar = {
                 if (activeStream == null && !isResolvingEmbed) {
@@ -439,11 +482,14 @@ fun MainAppContent(viewModel: MainViewModel) {
                         SavedScreen(
                             watchlist = watchlist,
                             savedCompanies = savedCompanies,
+                            savedPeople = savedPeople,
                             selectedRegion = selectedContentRegion,
                             onItemClick = { item -> viewModel.playFromWatchlist(item) },
                             onRemoveItem = { id -> viewModel.removeFromWatchlist(id) },
                             onOpenCompany = { companyId -> viewModel.openCompanyById(companyId) },
                             onRemoveCompany = { companyId -> viewModel.removeSavedCompany(companyId) },
+                            onOpenPerson = { personId -> viewModel.selectPerson(personId) },
+                            onRemovePerson = { personId -> viewModel.removeSavedPerson(personId) },
                             onNavigateToTab = { tab -> viewModel.setTab(tab) }
                         )
                     }
@@ -451,6 +497,13 @@ fun MainAppContent(viewModel: MainViewModel) {
                     AppTab.RECENT -> {
                         RecentScreen(
                             historyList = recentHistory,
+                            onItemClick = { history ->
+                                if (history.mediaType == "tv") {
+                                    viewModel.openTvDetail(history.mediaId)
+                                } else {
+                                    viewModel.openMovieDetail(history.mediaId)
+                                }
+                            },
                             onResumePlayback = { history -> viewModel.playFromHistory(history) },
                             onDeleteItem = { id -> viewModel.deleteHistoryItem(id) },
                             onClearAllHistory = { viewModel.clearAllHistory() },
@@ -480,13 +533,8 @@ fun MainAppContent(viewModel: MainViewModel) {
                 onPlayMovie = { movie -> viewModel.playMovieSimple(movie) },
                 onToggleWatchlistMovie = { movie -> viewModel.toggleWatchlistMovie(movie) },
                 onToggleWatchlistTv = { tv -> viewModel.toggleWatchlistTv(tv) },
-                onReportPerson = { person ->
-                    reportViewModel.openReportDialog(
-                        type = ReportTargetType.Person,
-                        id = person.id,
-                        title = person.name
-                    )
-                },
+                isPersonSaved = selectedPerson?.let { savedPersonIds.contains(it.id) } ?: false,
+                onToggleSavePerson = { selectedPerson?.let { viewModel.toggleSavePerson(it) } },
                 onDismiss = { viewModel.closePeopleDialog() }
             )
         }
@@ -597,7 +645,9 @@ fun MainAppContent(viewModel: MainViewModel) {
                 isSending = isReportSending,
                 onReasonChange = { text -> reportViewModel.onReasonChanged(text) },
                 onSubmit = {
-                    reportViewModel.submitReport()
+                    reportViewModel.submitReport {
+                        viewModel.closeDetailModal()
+                    }
                 },
                 onDismiss = { reportViewModel.closeReportDialog() }
             )
@@ -614,5 +664,73 @@ fun MainAppContent(viewModel: MainViewModel) {
             updateInfo = availableUpdate,
             onDismiss = { viewModel.dismissUpdateDialog() }
         )
+
+        // Initial Background Preparation Overlay ("Please wait..." or "No internet connected")
+        com.example.ui.components.PleaseWaitOverlay(
+            isVisible = isInitializingContent,
+            isOffline = isOfflineError,
+            errorMessage = "No internet connected",
+            onRetry = { viewModel.retryInitialization() }
+        )
+
+        // Top-most Toast/Snackbar Layer (Always on top of all dialogs, modals, and overlays)
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .navigationBarsPadding()
+                .padding(bottom = 20.dp, start = 16.dp, end = 16.dp)
+                .zIndex(99999f)
+        ) { data ->
+            Snackbar(
+                snackbarData = data,
+                containerColor = Color.White,
+                contentColor = Color.Black,
+                shape = RoundedCornerShape(12.dp)
+            )
+        }
+
+        // Dedicated Top-Layer Window Popup Toast (Never obscured by bottom sheets, dialogs, or video player)
+        if (topToastMessage != null) {
+            Popup(
+                alignment = Alignment.BottomCenter,
+                properties = PopupProperties(
+                    focusable = false,
+                    dismissOnBackPress = false,
+                    dismissOnClickOutside = false,
+                    clippingEnabled = false
+                )
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .navigationBarsPadding()
+                        .padding(bottom = 26.dp, start = 16.dp, end = 16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = Color.White,
+                        shadowElevation = 16.dp,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE0E0E0)),
+                        modifier = Modifier.wrapContentSize()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Text(
+                                text = topToastMessage!!,
+                                color = Color.Black,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
+                }
+            }
+        }
     }
 }

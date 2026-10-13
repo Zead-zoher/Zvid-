@@ -13,7 +13,7 @@ data class ProductionCompanyInfo(
     val adult: Boolean = false
 ) {
     val fullLogoUrl: String? get() = logoPath?.let {
-        if (it.startsWith("http")) it else "https://image.tmdb.org/t/p/w500$it"
+        if (it.startsWith("http")) it else "https://image.tmdb.org/t/p/w342$it"
     }
 }
 

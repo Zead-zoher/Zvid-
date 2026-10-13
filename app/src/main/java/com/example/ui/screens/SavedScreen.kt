@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.Business
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -44,30 +45,34 @@ import com.example.viewmodel.AppTab
 import com.example.viewmodel.ContentRegion
 
 val WatchlistEntity.fullPosterUrl: String?
-    get() = posterPath?.let { if (it.startsWith("http")) it else "https://image.tmdb.org/t/p/w500$it" }
+    get() = posterPath?.let { if (it.startsWith("http")) it else "https://image.tmdb.org/t/p/w342$it" }
 
 val SavedCompanyEntity.fullLogoUrl: String?
-    get() = logoPath?.let { if (it.startsWith("http")) it else "https://image.tmdb.org/t/p/w500$it" }
+    get() = logoPath?.let { if (it.startsWith("http")) it else "https://image.tmdb.org/t/p/w342$it" }
 
 @Composable
 fun SavedScreen(
     watchlist: List<WatchlistEntity>,
     savedCompanies: List<SavedCompanyEntity> = emptyList(),
+    savedPeople: List<com.example.data.local.SavedPersonItem> = emptyList(),
     selectedRegion: ContentRegion = ContentRegion.GLOBAL,
     onItemClick: (WatchlistEntity) -> Unit,
     onRemoveItem: (Int) -> Unit,
     onOpenCompany: (Int) -> Unit = {},
     onRemoveCompany: (Int) -> Unit = {},
+    onOpenPerson: (Int) -> Unit = {},
+    onRemovePerson: (Int) -> Unit = {},
     onNavigateToTab: (AppTab) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var selectedFilter by remember { mutableStateOf("all") } // "all", "movie", "tv", "companies"
+    var selectedFilter by remember { mutableStateOf("all") } // "all", "movie", "tv", "companies", "people"
 
     val moviesCount = watchlist.count { it.mediaType == "movie" }
     val tvCount = watchlist.count { it.mediaType == "tv" }
     val companiesCount = savedCompanies.size
+    val peopleCount = savedPeople.size
 
-    val isCompletelyEmpty = watchlist.isEmpty() && savedCompanies.isEmpty()
+    val isCompletelyEmpty = watchlist.isEmpty() && savedCompanies.isEmpty() && savedPeople.isEmpty()
 
     Box(
         modifier = modifier
@@ -184,9 +189,14 @@ fun SavedScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     WatchlistFilterChip(
-                        label = "All (${watchlist.size + companiesCount})",
+                        label = "All (${watchlist.size + companiesCount + peopleCount})",
                         isSelected = selectedFilter == "all",
                         onClick = { selectedFilter = "all" }
+                    )
+                    WatchlistFilterChip(
+                        label = "Actors ($peopleCount)",
+                        isSelected = selectedFilter == "people",
+                        onClick = { selectedFilter = "people" }
                     )
                     WatchlistFilterChip(
                         label = "Companies ($companiesCount)",
@@ -205,7 +215,40 @@ fun SavedScreen(
                     )
                 }
 
-                if (selectedFilter == "companies") {
+                if (selectedFilter == "people") {
+                    // Actors / People List Only
+                    if (savedPeople.isEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(32.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "No saved actors yet. Save an actor from their profile.",
+                                color = NetflixTextSecondary,
+                                fontSize = 13.sp,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    } else {
+                        LazyVerticalGrid(
+                            columns = GridCells.Adaptive(110.dp),
+                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            items(savedPeople, key = { it.id }) { person ->
+                                SavedPersonCard(
+                                    person = person,
+                                    onClick = { onOpenPerson(person.id) },
+                                    onRemove = { onRemovePerson(person.id) }
+                                )
+                            }
+                        }
+                    }
+                } else if (selectedFilter == "companies") {
                     // Companies List Only
                     if (savedCompanies.isEmpty()) {
                         Box(
@@ -251,6 +294,45 @@ fun SavedScreen(
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                         modifier = Modifier.fillMaxSize()
                     ) {
+                        // If "all" and there are saved actors, show a horizontal strip for them at top!
+                        if (selectedFilter == "all" && savedPeople.isNotEmpty()) {
+                            item {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(bottom = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        text = "Saved Actors (${savedPeople.size})",
+                                        color = NetflixTextPrimary,
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = "View All",
+                                        color = NetflixRed,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        modifier = Modifier.clickable { selectedFilter = "people" }
+                                    )
+                                }
+
+                                LazyRow(
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    modifier = Modifier.padding(bottom = 16.dp)
+                                ) {
+                                    items(savedPeople, key = { it.id }) { person ->
+                                        SavedPersonMiniCard(
+                                            person = person,
+                                            onClick = { onOpenPerson(person.id) },
+                                            onRemove = { onRemovePerson(person.id) }
+                                        )
+                                    }
+                                }
+                            }
+                        }
                         // If "all" and there are saved companies, show a horizontal strip for them at top!
                         if (selectedFilter == "all" && savedCompanies.isNotEmpty()) {
                             item {
@@ -657,6 +739,151 @@ fun WatchlistFilterChip(
                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                 maxLines = 1,
                 softWrap = false
+            )
+        }
+    }
+}
+
+@Composable
+fun SavedPersonCard(
+    person: com.example.data.local.SavedPersonItem,
+    onClick: () -> Unit,
+    onRemove: () -> Unit
+) {
+    Card(
+        shape = RoundedCornerShape(10.dp),
+        colors = CardDefaults.cardColors(containerColor = NetflixCardElevated),
+        border = androidx.compose.foundation.BorderStroke(1.dp, NetflixBorder),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
+            .testTag("saved_person_card_${person.id}")
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(10.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(72.dp)
+                    .clip(androidx.compose.foundation.shape.CircleShape)
+                    .background(NetflixSurfaceVariant),
+                contentAlignment = Alignment.Center
+            ) {
+                if (!person.profilePath.isNullOrBlank()) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(LocalContext.current)
+                            .data(person.fullProfileUrl)
+                            .crossfade(true)
+                            .build(),
+                        contentDescription = person.name,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.Person,
+                        contentDescription = null,
+                        tint = NetflixTextMuted,
+                        modifier = Modifier.size(36.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = person.name,
+                color = NetflixTextPrimary,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(
+                    onClick = onRemove,
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Bookmark,
+                        contentDescription = "Remove",
+                        tint = NetflixRed,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun SavedPersonMiniCard(
+    person: com.example.data.local.SavedPersonItem,
+    onClick: () -> Unit,
+    onRemove: () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(8.dp),
+        color = NetflixCardElevated,
+        border = androidx.compose.foundation.BorderStroke(1.dp, NetflixBorder),
+        modifier = Modifier
+            .width(110.dp)
+            .height(110.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(6.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(54.dp)
+                    .clip(androidx.compose.foundation.shape.CircleShape)
+                    .background(NetflixSurfaceVariant),
+                contentAlignment = Alignment.Center
+            ) {
+                if (!person.profilePath.isNullOrBlank()) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(LocalContext.current)
+                            .data(person.fullProfileUrl)
+                            .crossfade(true)
+                            .build(),
+                        contentDescription = person.name,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.Person,
+                        contentDescription = null,
+                        tint = NetflixTextMuted,
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            Text(
+                text = person.name,
+                color = NetflixTextPrimary,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
     }

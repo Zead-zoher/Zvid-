@@ -28,8 +28,8 @@ data class TmdbMovie(
 ) {
     val displayTitle: String get() = title ?: originalTitle ?: "Untitled Movie"
     val year: String get() = releaseDate?.take(4) ?: "N/A"
-    val fullPosterUrl: String? get() = posterPath?.let { "https://image.tmdb.org/t/p/w500$it" }
-    val fullBackdropUrl: String? get() = backdropPath?.let { "https://image.tmdb.org/t/p/w1280$it" } ?: fullPosterUrl
+    val fullPosterUrl: String? get() = posterPath?.let { "https://image.tmdb.org/t/p/w342$it" }
+    val fullBackdropUrl: String? get() = backdropPath?.let { "https://image.tmdb.org/t/p/w780$it" } ?: fullPosterUrl
 }
 
 @JsonClass(generateAdapter = true)
@@ -49,8 +49,8 @@ data class TmdbTv(
 ) {
     val displayTitle: String get() = name ?: originalName ?: "Untitled Show"
     val year: String get() = firstAirDate?.take(4) ?: "N/A"
-    val fullPosterUrl: String? get() = posterPath?.let { "https://image.tmdb.org/t/p/w500$it" }
-    val fullBackdropUrl: String? get() = backdropPath?.let { "https://image.tmdb.org/t/p/w1280$it" } ?: fullPosterUrl
+    val fullPosterUrl: String? get() = posterPath?.let { "https://image.tmdb.org/t/p/w342$it" }
+    val fullBackdropUrl: String? get() = backdropPath?.let { "https://image.tmdb.org/t/p/w780$it" } ?: fullPosterUrl
 }
 
 @JsonClass(generateAdapter = true)
@@ -123,8 +123,8 @@ data class TmdbMovieDetail(
     val displayTitle: String get() = title ?: originalTitle ?: "Untitled Movie"
     val year: String get() = releaseDate?.take(4) ?: "N/A"
     val formattedRuntime: String get() = runtime?.let { "${it / 60}h ${it % 60}m" } ?: "N/A"
-    val fullPosterUrl: String? get() = posterPath?.let { "https://image.tmdb.org/t/p/w500$it" }
-    val fullBackdropUrl: String? get() = backdropPath?.let { "https://image.tmdb.org/t/p/w1280$it" } ?: fullPosterUrl
+    val fullPosterUrl: String? get() = posterPath?.let { "https://image.tmdb.org/t/p/w342$it" }
+    val fullBackdropUrl: String? get() = backdropPath?.let { "https://image.tmdb.org/t/p/w780$it" } ?: fullPosterUrl
 }
 
 @JsonClass(generateAdapter = true)
@@ -165,8 +165,8 @@ data class TmdbTvDetail(
     val effectiveImdbId: String? get() = externalIds?.imdbId
     val displayTitle: String get() = name ?: originalName ?: "Untitled Show"
     val year: String get() = firstAirDate?.take(4) ?: "N/A"
-    val fullPosterUrl: String? get() = posterPath?.let { "https://image.tmdb.org/t/p/w500$it" }
-    val fullBackdropUrl: String? get() = backdropPath?.let { "https://image.tmdb.org/t/p/w1280$it" } ?: fullPosterUrl
+    val fullPosterUrl: String? get() = posterPath?.let { "https://image.tmdb.org/t/p/w342$it" }
+    val fullBackdropUrl: String? get() = backdropPath?.let { "https://image.tmdb.org/t/p/w780$it" } ?: fullPosterUrl
 }
 
 @JsonClass(generateAdapter = true)
@@ -247,8 +247,8 @@ data class TmdbCollectionItem(
     @Json(name = "original_language") val originalLanguage: String? = null
 ) {
     val displayTitle: String get() = name ?: "Untitled Collection"
-    val fullPosterUrl: String? get() = posterPath?.let { "https://image.tmdb.org/t/p/w500$it" }
-    val fullBackdropUrl: String? get() = backdropPath?.let { "https://image.tmdb.org/t/p/w1280$it" } ?: fullPosterUrl
+    val fullPosterUrl: String? get() = posterPath?.let { "https://image.tmdb.org/t/p/w342$it" }
+    val fullBackdropUrl: String? get() = backdropPath?.let { "https://image.tmdb.org/t/p/w780$it" } ?: fullPosterUrl
 }
 
 // === PEOPLE & CAST MODELS ===
@@ -262,7 +262,7 @@ data class TmdbPerson(
     @Json(name = "popularity") val popularity: Double = 0.0,
     @Json(name = "adult") val adult: Boolean = false
 ) {
-    val fullProfileUrl: String? get() = profilePath?.let { "https://image.tmdb.org/t/p/w500$it" }
+    val fullProfileUrl: String? get() = profilePath?.let { "https://image.tmdb.org/t/p/w185$it" }
 }
 
 @JsonClass(generateAdapter = true)
@@ -296,7 +296,7 @@ data class TmdbPersonCreditItem(
 ) {
     val displayTitle: String get() = title ?: name ?: "Untitled"
     val year: String get() = (releaseDate ?: firstAirDate)?.take(4) ?: "N/A"
-    val fullPosterUrl: String? get() = posterPath?.let { "https://image.tmdb.org/t/p/w500$it" }
+    val fullPosterUrl: String? get() = posterPath?.let { "https://image.tmdb.org/t/p/w342$it" }
 }
 
 @JsonClass(generateAdapter = true)
@@ -313,6 +313,6 @@ data class TmdbPersonDetail(
     @Json(name = "tv_credits") val tvCredits: TmdbPersonTvCredits? = null,
     @Json(name = "adult") val adult: Boolean = false
 ) {
-    val fullProfileUrl: String? get() = profilePath?.let { "https://image.tmdb.org/t/p/w500$it" }
+    val fullProfileUrl: String? get() = profilePath?.let { "https://image.tmdb.org/t/p/w185$it" }
 }
 

@@ -75,6 +75,11 @@ interface TmdbApi {
         @Query("page") page: Int = 1
     ): TmdbPagedResponse<com.example.data.model.TmdbKeyword>
 
+    @GET("keyword/{keyword_id}")
+    suspend fun getKeywordDetails(
+        @Path("keyword_id") keywordId: Int
+    ): com.example.data.model.TmdbKeyword
+
     @GET("movie/{movie_id}")
     suspend fun getMovieDetails(
         @Path("movie_id") movieId: Int,

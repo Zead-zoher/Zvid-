@@ -109,7 +109,7 @@ class ReportViewModel(application: Application) : AndroidViewModel(application) 
                 is ReportResult.Success -> {
                     closeReportDialog()
                     onReportSubmittedLocally(itemToSend)
-                    _snackbarEvent.emit("Thanks, report sent")
+                    _snackbarEvent.emit("شكراً، تم إرسال البلاغ بنجاح")
                 }
                 is ReportResult.Error -> {
                     _isSending.value = false

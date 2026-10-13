@@ -608,11 +608,7 @@ class MediaRepository(
         currentPositionSeconds: Long,
         totalDurationSeconds: Long
     ) = withContext(Dispatchers.IO) {
-        val historyId = if (mediaType == "tv" && seasonNumber != null && episodeNumber != null) {
-            "tv_${mediaId}_s${seasonNumber}_e${episodeNumber}"
-        } else {
-            "movie_${mediaId}"
-        }
+        val historyId = "${mediaType}_${mediaId}"
         val entity = RecentHistoryEntity(
             historyId = historyId,
             mediaId = mediaId,
@@ -959,6 +955,19 @@ class MediaRepository(
         } catch (_: Exception) {}
     }
 
+    suspend fun resolveAndExtractKeywordWords() = withContext(Dispatchers.IO) {
+        val keywords = ContentFilter.getAllBlockedKeywordIds()
+        for (keywordId in keywords) {
+            try {
+                val detail = api.getKeywordDetails(keywordId)
+                if (detail.name.isNotBlank()) {
+                    ContentFilter.registerResolvedKeyword(keywordId, detail.name)
+                }
+            } catch (_: Exception) {}
+        }
+        ContentFilter.markKeywordsResolved()
+    }
+
     suspend fun resolveAndBlockWorksForKeyword(keywordId: Int) = withContext(Dispatchers.IO) {
         try {
             val movieIds = mutableListOf<Int>()
@@ -986,17 +995,65 @@ class MediaRepository(
     }
 
     suspend fun syncAllBlockedWorks() = withContext(Dispatchers.IO) {
+        // 1. Resolve keyword names first
+        resolveAndExtractKeywordWords()
+
+        val allMovieIds = mutableSetOf<Int>()
+        val allTvIds = mutableSetOf<Int>()
+
         val people = ContentFilter.getAllBlockedPeopleIds()
         for (personId in people) {
-            resolveAndBlockWorksForPerson(personId)
+            try {
+                val detail = api.getPersonDetails(personId, appendToResponse = "movie_credits,tv_credits")
+                detail.movieCredits?.cast?.map { it.id }?.let { allMovieIds.addAll(it) }
+                detail.tvCredits?.cast?.map { it.id }?.let { allTvIds.addAll(it) }
+            } catch (_: Exception) {}
         }
+
         val companies = ContentFilter.getAllBlockedCompanyIds()
         for (companyId in companies) {
-            resolveAndBlockWorksForCompany(companyId)
+            try {
+                for (p in 1..2) {
+                    val moviesRes = try {
+                        api.discoverMovies(withCompanies = companyId.toString(), page = p)
+                    } catch (_: Exception) { null }
+                    if (moviesRes != null) {
+                        allMovieIds.addAll(moviesRes.results.map { it.id })
+                        if (p >= moviesRes.totalPages) break
+                    } else break
+                }
+                for (p in 1..2) {
+                    val tvRes = try {
+                        api.discoverTv(withCompanies = companyId.toString(), page = p)
+                    } catch (_: Exception) { null }
+                    if (tvRes != null) {
+                        allTvIds.addAll(tvRes.results.map { it.id })
+                        if (p >= tvRes.totalPages) break
+                    } else break
+                }
+            } catch (_: Exception) {}
         }
+
         val keywords = ContentFilter.getAllBlockedKeywordIds()
         for (keywordId in keywords) {
-            resolveAndBlockWorksForKeyword(keywordId)
+            try {
+                val moviesRes = try {
+                    api.discoverMovies(withKeywords = keywordId.toString(), page = 1)
+                } catch (_: Exception) { null }
+                if (moviesRes != null) {
+                    allMovieIds.addAll(moviesRes.results.map { it.id })
+                }
+                val tvRes = try {
+                    api.discoverTv(withKeywords = keywordId.toString(), page = 1)
+                } catch (_: Exception) { null }
+                if (tvRes != null) {
+                    allTvIds.addAll(tvRes.results.map { it.id })
+                }
+            } catch (_: Exception) {}
+        }
+
+        if (allMovieIds.isNotEmpty() || allTvIds.isNotEmpty()) {
+            ContentFilter.addDerivedBlockedWorks(allMovieIds, allTvIds)
         }
     }
 

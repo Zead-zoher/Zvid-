@@ -32,8 +32,13 @@ import com.example.player.EmbedStreamResolver
 import com.example.player.EmbeddedHttpServer
 import com.example.player.ResolvedStream
 import com.example.player.StreamResolver
+import coil.imageLoader
+import coil.request.ImageRequest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -44,6 +49,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 enum class AppTab {
     MOVIES,
@@ -81,6 +87,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val remoteBlocklist = RemoteBlocklist(application)
     val updateChecker = com.example.data.update.AppUpdateChecker(application)
     val searchHistoryStore = com.example.data.local.SearchHistoryStore(application)
+    val savedPersonStore = com.example.data.local.SavedPersonStore(application)
+    val savedPersonIds: StateFlow<Set<Int>> = savedPersonStore.savedPersonIds
+    val savedPeopleList: StateFlow<List<com.example.data.local.SavedPersonItem>> = savedPersonStore.savedPeopleList
     private val database = ZvidDatabase.getDatabase(application)
     val repository = MediaRepository(
         apiKeyStore = apiKeyStore,
@@ -109,6 +118,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _isDetailUnavailable = MutableStateFlow(false)
     val isDetailUnavailable: StateFlow<Boolean> = _isDetailUnavailable.asStateFlow()
+
+    // Flag indicating initial content & blocklist preparation overlay ("Please wait...")
+    private val _isInitializingContent = MutableStateFlow(true)
+    val isInitializingContent: StateFlow<Boolean> = _isInitializingContent.asStateFlow()
+
+    // Offline / Network error flag during loading screen
+    private val _isOfflineError = MutableStateFlow(false)
+    val isOfflineError: StateFlow<Boolean> = _isOfflineError.asStateFlow()
+
+    fun retryInitialization() {
+        refreshFilterAndContent(isInitial = true)
+    }
 
     fun dismissUnavailable() {
         _isDetailUnavailable.value = false
@@ -295,10 +316,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     // === WATCHLIST & RECENT HISTORY (ROOM) ===
     val watchlistItems: StateFlow<List<WatchlistEntity>> = repository.getAllWatchlist()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     val recentHistoryItems: StateFlow<List<RecentHistoryEntity>> = repository.getAllHistory()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     // === COMPANIES TAB STATE ===
     private val _companies = MutableStateFlow<List<ProductionCompanyInfo>>(emptyList())
@@ -564,6 +585,25 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _selectedPerson.value = null
     }
 
+    fun toggleSavePerson(person: TmdbPersonDetail) {
+        val isSaved = savedPersonStore.toggleSavePerson(
+            personId = person.id,
+            name = person.name,
+            profilePath = person.profilePath,
+            department = person.knownForDepartment
+        )
+        viewModelScope.launch {
+            _userMessage.emit(if (isSaved) "تم حفظ الممثل ${person.name}" else "تم إزالة الممثل ${person.name}")
+        }
+    }
+
+    fun removeSavedPerson(personId: Int) {
+        savedPersonStore.toggleSavePerson(personId)
+        viewModelScope.launch {
+            _userMessage.emit("تم إزالة الممثل من المحفوظات")
+        }
+    }
+
     // Search debounce jobs
     private var movieSearchJob: Job? = null
     private var tvSearchJob: Job? = null
@@ -594,25 +634,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     )
 
     init {
-        viewModelScope.launch {
-            remoteBlocklist.initialize()
-            // Load content immediately for instantaneous startup
-            loadMovies()
-            loadSeries()
-            loadCompaniesForRegion()
-            loadPopularPeople()
-
-            // Run deep blocked works sync in the background without blocking the UI
-            launch(Dispatchers.IO) {
-                repository.syncAllBlockedWorks()
-            }
-
-            // Check for newer version on GitHub in background
-            val updateInfo = updateChecker.checkForUpdate()
-            if (updateInfo != null) {
-                _availableUpdate.value = updateInfo
-            }
-        }
+        refreshFilterAndContent(isInitial = true)
         viewModelScope.launch {
             ContentFilter.blocklist.collect {
                 // Re-filter currently displayed movies and series
@@ -663,31 +685,65 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
         viewModelScope.launch {
             ContentFilter.derivedBlockedMovieIds.collect { derivedIds ->
-                _trendingMovies.value = ContentFilter.filterMovies(_trendingMovies.value)
-                _popularMovies.value = ContentFilter.filterMovies(_popularMovies.value)
-                _topRatedMovies.value = ContentFilter.filterMovies(_topRatedMovies.value)
-                _movieSearchResults.value = ContentFilter.filterMovies(_movieSearchResults.value)
-                _movieSuggestions.value = ContentFilter.filterMovies(_movieSuggestions.value)
+                if (derivedIds.isNotEmpty()) {
+                    val curTrending = _trendingMovies.value
+                    if (curTrending.any { derivedIds.contains(it.id) }) {
+                        _trendingMovies.value = curTrending.filterNot { derivedIds.contains(it.id) }
+                    }
+                    val curPopular = _popularMovies.value
+                    if (curPopular.any { derivedIds.contains(it.id) }) {
+                        _popularMovies.value = curPopular.filterNot { derivedIds.contains(it.id) }
+                    }
+                    val curTopRated = _topRatedMovies.value
+                    if (curTopRated.any { derivedIds.contains(it.id) }) {
+                        _topRatedMovies.value = curTopRated.filterNot { derivedIds.contains(it.id) }
+                    }
+                    val curSearch = _movieSearchResults.value
+                    if (curSearch.any { derivedIds.contains(it.id) }) {
+                        _movieSearchResults.value = curSearch.filterNot { derivedIds.contains(it.id) }
+                    }
+                    val curSuggestions = _movieSuggestions.value
+                    if (curSuggestions.any { derivedIds.contains(it.id) }) {
+                        _movieSuggestions.value = curSuggestions.filterNot { derivedIds.contains(it.id) }
+                    }
 
-                val currentMovie = _activeMovieDetail.value
-                if (currentMovie != null && (derivedIds.contains(currentMovie.id) || ContentFilter.isBlockedMovie(currentMovie))) {
-                    _activeMovieDetail.value = null
-                    _isDetailUnavailable.value = true
+                    val currentMovie = _activeMovieDetail.value
+                    if (currentMovie != null && (derivedIds.contains(currentMovie.id) || ContentFilter.isBlockedMovie(currentMovie))) {
+                        _activeMovieDetail.value = null
+                        _isDetailUnavailable.value = true
+                    }
                 }
             }
         }
         viewModelScope.launch {
             ContentFilter.derivedBlockedTvIds.collect { derivedIds ->
-                _trendingTv.value = ContentFilter.filterTv(_trendingTv.value)
-                _popularTv.value = ContentFilter.filterTv(_popularTv.value)
-                _newReleaseTv.value = ContentFilter.filterTv(_newReleaseTv.value)
-                _tvSearchResults.value = ContentFilter.filterTv(_tvSearchResults.value)
-                _tvSuggestions.value = ContentFilter.filterTv(_tvSuggestions.value)
+                if (derivedIds.isNotEmpty()) {
+                    val curTrending = _trendingTv.value
+                    if (curTrending.any { derivedIds.contains(it.id) }) {
+                        _trendingTv.value = curTrending.filterNot { derivedIds.contains(it.id) }
+                    }
+                    val curPopular = _popularTv.value
+                    if (curPopular.any { derivedIds.contains(it.id) }) {
+                        _popularTv.value = curPopular.filterNot { derivedIds.contains(it.id) }
+                    }
+                    val curNewRel = _newReleaseTv.value
+                    if (curNewRel.any { derivedIds.contains(it.id) }) {
+                        _newReleaseTv.value = curNewRel.filterNot { derivedIds.contains(it.id) }
+                    }
+                    val curSearch = _tvSearchResults.value
+                    if (curSearch.any { derivedIds.contains(it.id) }) {
+                        _tvSearchResults.value = curSearch.filterNot { derivedIds.contains(it.id) }
+                    }
+                    val curSuggestions = _tvSuggestions.value
+                    if (curSuggestions.any { derivedIds.contains(it.id) }) {
+                        _tvSuggestions.value = curSuggestions.filterNot { derivedIds.contains(it.id) }
+                    }
 
-                val currentTv = _activeTvDetail.value
-                if (currentTv != null && (derivedIds.contains(currentTv.id) || ContentFilter.isBlockedTv(currentTv))) {
-                    _activeTvDetail.value = null
-                    _isDetailUnavailable.value = true
+                    val currentTv = _activeTvDetail.value
+                    if (currentTv != null && (derivedIds.contains(currentTv.id) || ContentFilter.isBlockedTv(currentTv))) {
+                        _activeTvDetail.value = null
+                        _isDetailUnavailable.value = true
+                    }
                 }
             }
         }
@@ -711,6 +767,96 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _apiKeyInput.value = key
     }
 
+    fun refreshFilterAndContent(isInitial: Boolean = false) {
+        viewModelScope.launch {
+            _isInitializingContent.value = true
+            _isOfflineError.value = false
+
+            // 1. Reset keywords
+            ContentFilter.resetResolvedKeywords()
+
+            // 2. Fetch remote blocklist and remote version file
+            val blocklistFetchSuccess = remoteBlocklist.initialize()
+            val (updateFetchSuccess, updateInfo) = updateChecker.fetchUpdateFile()
+
+            // If downloading blocklist OR version file failed:
+            // Switch from loading to "No internet connected" and stop laser animation
+            if (!blocklistFetchSuccess || !updateFetchSuccess) {
+                _isOfflineError.value = true
+                return@launch
+            }
+
+            _isOfflineError.value = false
+
+            // If remote version > current version (strictly newer), show update dialog
+            if (updateInfo != null) {
+                _availableUpdate.value = updateInfo
+            }
+
+            try {
+                // 3. Resolve keyword words using user's active key
+                repository.resolveAndExtractKeywordWords()
+
+                // 4. Concurrently load catalog content (movies, series, companies, popular people)
+                coroutineScope {
+                    val mDeferred = async { fetchMoviesData() }
+                    val sDeferred = async { fetchSeriesData() }
+                    val cDeferred = async { loadCompaniesForRegion() }
+                    val pDeferred = async { loadPopularPeople() }
+                    mDeferred.await()
+                    sDeferred.await()
+                    cDeferred.await()
+                    pDeferred.await()
+                }
+
+                // 5. Preload images for movies and series so content and posters are fully ready
+                preloadInitialImages()
+                _isInitializingContent.value = false
+            } catch (_: Exception) {
+                _isOfflineError.value = true
+            }
+
+            // 6. Run deep blocked works sync in background (actor credits, company credits, keyword discovery)
+            launch(Dispatchers.IO) {
+                repository.syncAllBlockedWorks()
+            }
+        }
+    }
+
+    private suspend fun preloadInitialImages() {
+        val urlsToPreload = mutableListOf<String>()
+        _heroMovie.value?.fullBackdropUrl?.let { urlsToPreload.add(it) }
+        _heroMovie.value?.fullPosterUrl?.let { urlsToPreload.add(it) }
+        _heroTv.value?.fullBackdropUrl?.let { urlsToPreload.add(it) }
+        _heroTv.value?.fullPosterUrl?.let { urlsToPreload.add(it) }
+
+        _trendingMovies.value.take(8).forEach { m ->
+            m.fullPosterUrl?.let { urlsToPreload.add(it) }
+        }
+        _trendingTv.value.take(8).forEach { t ->
+            t.fullPosterUrl?.let { urlsToPreload.add(it) }
+        }
+
+        val distinctUrls = urlsToPreload.filter { it.isNotBlank() }.distinct()
+        if (distinctUrls.isEmpty()) return
+
+        val app = getApplication<Application>()
+        withTimeoutOrNull(4500L) {
+            coroutineScope {
+                distinctUrls.map { url ->
+                    async(Dispatchers.IO) {
+                        try {
+                            val request = ImageRequest.Builder(app)
+                                .data(url)
+                                .build()
+                            app.imageLoader.execute(request)
+                        } catch (_: Exception) {}
+                    }
+                }.awaitAll()
+            }
+        }
+    }
+
     fun saveAndValidateApiKey(newKey: String) {
         viewModelScope.launch {
             _isKeyTesting.value = true
@@ -727,8 +873,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             if (validation.isSuccess) {
                 _keyValidationStatus.value = "Success: TMDB API Key verified!"
                 _userMessage.emit("TMDB Key activated successfully")
-                loadMovies()
-                loadSeries()
+                _isSettingsOpen.value = false
+                // Instantly refresh filter and reload content & images under Please wait overlay
+                refreshFilterAndContent(isInitial = false)
             } else {
                 _keyValidationStatus.value = "Warning: Could not verify key. Check connection or key correctness."
             }
@@ -739,37 +886,41 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         apiKeyStore.setDemoKey()
         _apiKeyInput.value = ApiKeyStore.DEFAULT_DEMO_KEY
         _keyValidationStatus.value = "Using default TMDB demo access."
+        _isSettingsOpen.value = false
         viewModelScope.launch {
             _userMessage.emit("Switched to TMDB Demo Key")
-            loadMovies()
-            loadSeries()
         }
+        refreshFilterAndContent(isInitial = false)
     }
 
     // === MOVIES ACTIONS ===
+    private suspend fun fetchMoviesData() {
+        _isMoviesLoading.value = true
+        try {
+            val region = _selectedContentRegion.value
+            val trendingRes = repository.getTrendingMovies("day", 1, region)
+            val trending = trendingRes.getOrDefault(emptyList())
+            _trendingMovies.value = trending
+            _heroMovie.value = trending.firstOrNull { it.backdropPath != null } ?: trending.firstOrNull()
+
+            val popularRes = repository.getPopularMovies(1, region)
+            _popularMovies.value = popularRes.getOrDefault(emptyList())
+
+            val newRelRes = repository.getNewReleaseMovies(1, region)
+            _newReleaseMovies.value = newRelRes.getOrDefault(emptyList())
+
+            val topRatedRes = repository.getTopRatedMovies(1, region)
+            _topRatedMovies.value = topRatedRes.getOrDefault(emptyList())
+        } catch (e: Exception) {
+            _userMessage.emit("Failed to load movies: ${e.message}")
+        } finally {
+            _isMoviesLoading.value = false
+        }
+    }
+
     fun loadMovies() {
         viewModelScope.launch {
-            _isMoviesLoading.value = true
-            try {
-                val region = _selectedContentRegion.value
-                val trendingRes = repository.getTrendingMovies("day", 1, region)
-                val trending = trendingRes.getOrDefault(emptyList())
-                _trendingMovies.value = trending
-                _heroMovie.value = trending.firstOrNull { it.backdropPath != null } ?: trending.firstOrNull()
-
-                val popularRes = repository.getPopularMovies(1, region)
-                _popularMovies.value = popularRes.getOrDefault(emptyList())
-
-                val newRelRes = repository.getNewReleaseMovies(1, region)
-                _newReleaseMovies.value = newRelRes.getOrDefault(emptyList())
-
-                val topRatedRes = repository.getTopRatedMovies(1, region)
-                _topRatedMovies.value = topRatedRes.getOrDefault(emptyList())
-            } catch (e: Exception) {
-                _userMessage.emit("Failed to load movies: ${e.message}")
-            } finally {
-                _isMoviesLoading.value = false
-            }
+            fetchMoviesData()
         }
     }
 
@@ -892,29 +1043,33 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // === SERIES ACTIONS ===
+    private suspend fun fetchSeriesData() {
+        _isSeriesLoading.value = true
+        try {
+            val region = _selectedContentRegion.value
+            val trendingRes = repository.getTrendingTv("day", 1, region)
+            val trending = trendingRes.getOrDefault(emptyList())
+            _trendingTv.value = trending
+            _heroTv.value = trending.firstOrNull { it.backdropPath != null } ?: trending.firstOrNull()
+
+            val popularRes = repository.getPopularTv(1, region)
+            _popularTv.value = popularRes.getOrDefault(emptyList())
+
+            val newRelRes = repository.getNewReleaseTv(1, region)
+            _newReleaseTv.value = newRelRes.getOrDefault(emptyList())
+
+            val topRatedRes = repository.getTopRatedTv(1, region)
+            _topRatedTv.value = topRatedRes.getOrDefault(emptyList())
+        } catch (e: Exception) {
+            _userMessage.emit("Failed to load series: ${e.message}")
+        } finally {
+            _isSeriesLoading.value = false
+        }
+    }
+
     fun loadSeries() {
         viewModelScope.launch {
-            _isSeriesLoading.value = true
-            try {
-                val region = _selectedContentRegion.value
-                val trendingRes = repository.getTrendingTv("day", 1, region)
-                val trending = trendingRes.getOrDefault(emptyList())
-                _trendingTv.value = trending
-                _heroTv.value = trending.firstOrNull { it.backdropPath != null } ?: trending.firstOrNull()
-
-                val popularRes = repository.getPopularTv(1, region)
-                _popularTv.value = popularRes.getOrDefault(emptyList())
-
-                val newRelRes = repository.getNewReleaseTv(1, region)
-                _newReleaseTv.value = newRelRes.getOrDefault(emptyList())
-
-                val topRatedRes = repository.getTopRatedTv(1, region)
-                _topRatedTv.value = topRatedRes.getOrDefault(emptyList())
-            } catch (e: Exception) {
-                _userMessage.emit("Failed to load series: ${e.message}")
-            } finally {
-                _isSeriesLoading.value = false
-            }
+            fetchSeriesData()
         }
     }
 
@@ -1321,6 +1476,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _isResolvingStream.value = false
             _isResolvingEmbed.value = false
             _detectedStreamMedia.value = null
+
+            // Record to Recent Watch History on local playback
+            repository.savePlaybackProgress(
+                mediaId = detected.mediaId,
+                mediaType = detected.mediaType,
+                title = detected.title,
+                seasonNumber = detected.seasonNumber,
+                episodeNumber = detected.episodeNumber,
+                episodeTitle = detected.episodeTitle,
+                posterPath = detected.posterPath,
+                backdropPath = detected.backdropPath,
+                currentPositionSeconds = detected.initialPositionSeconds,
+                totalDurationSeconds = detected.totalDurationSeconds
+            )
         }
     }
 

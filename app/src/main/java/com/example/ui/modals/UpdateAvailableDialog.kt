@@ -52,7 +52,11 @@ fun UpdateAvailableDialog(
     val context = LocalContext.current
 
     AlertDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = { /* Mandatory update: cannot dismiss */ },
+        properties = androidx.compose.ui.window.DialogProperties(
+            dismissOnBackPress = false,
+            dismissOnClickOutside = false
+        ),
         containerColor = NetflixDarkSurface,
         shape = RoundedCornerShape(20.dp),
         title = {
@@ -123,7 +127,7 @@ fun UpdateAvailableDialog(
                 }
 
                 Text(
-                    text = "A newer version of the application is available. Download the update now to get the latest features and fixes.",
+                    text = "A newer version of the application is available. Download the update now to continue using Zvid.",
                     color = NetflixTextSecondary,
                     fontSize = 14.sp,
                     lineHeight = 20.sp
@@ -139,28 +143,17 @@ fun UpdateAvailableDialog(
                         }
                         context.startActivity(intent)
                     } catch (_: Exception) {}
-                    onDismiss()
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = NetflixRed),
                 shape = RoundedCornerShape(10.dp),
-                modifier = Modifier.testTag("download_update_button")
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("download_update_button")
             ) {
                 Text(
-                    text = "Download",
+                    text = "Download Now",
                     color = Color.White,
                     fontWeight = FontWeight.Bold
-                )
-            }
-        },
-        dismissButton = {
-            OutlinedButton(
-                onClick = onDismiss,
-                shape = RoundedCornerShape(10.dp),
-                modifier = Modifier.testTag("dismiss_update_button")
-            ) {
-                Text(
-                    text = "Later",
-                    color = NetflixTextSecondary
                 )
             }
         }

@@ -15,6 +15,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -59,6 +60,8 @@ fun PeopleDialogModal(
     onPlayMovie: (TmdbMovie) -> Unit,
     onToggleWatchlistMovie: (TmdbMovie) -> Unit,
     onToggleWatchlistTv: (TmdbTv) -> Unit,
+    isPersonSaved: Boolean = false,
+    onToggleSavePerson: () -> Unit = {},
     onReportPerson: (TmdbPersonDetail) -> Unit = {},
     onDismiss: () -> Unit
 ) {
@@ -82,6 +85,8 @@ fun PeopleDialogModal(
                     person = selectedPerson,
                     isLoading = isLoadingPerson,
                     watchlist = watchlist,
+                    isPersonSaved = isPersonSaved,
+                    onToggleSavePerson = onToggleSavePerson,
                     onBack = onBackFromPerson,
                     onMovieClick = onMovieClick,
                     onTvClick = onTvClick,
@@ -301,6 +306,8 @@ fun PersonDetailView(
     onPlayMovie: (TmdbMovie) -> Unit,
     onToggleWatchlistMovie: (TmdbMovie) -> Unit,
     onToggleWatchlistTv: (TmdbTv) -> Unit,
+    isPersonSaved: Boolean = false,
+    onToggleSavePerson: () -> Unit = {},
     onReport: () -> Unit = {},
     onClose: () -> Unit
 ) {
@@ -316,7 +323,7 @@ fun PersonDetailView(
             .padding(16.dp),
         contentPadding = PaddingValues(bottom = 32.dp)
     ) {
-        // Header with Back and Close
+        // Header with Back, Save Actor, and Close
         item {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -342,17 +349,17 @@ fun PersonDetailView(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     IconButton(
-                        onClick = onReport,
+                        onClick = onToggleSavePerson,
                         modifier = Modifier
                             .size(36.dp)
                             .clip(CircleShape)
                             .background(NetflixCardElevated)
-                            .testTag("report_person_btn")
+                            .testTag("save_person_btn")
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Flag,
-                            contentDescription = "Report Person",
-                            tint = Color.White,
+                            imageVector = if (isPersonSaved) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
+                            contentDescription = if (isPersonSaved) "Saved Actor" else "Save Actor",
+                            tint = if (isPersonSaved) NetflixRed else Color.White,
                             modifier = Modifier.size(18.dp)
                         )
                     }
@@ -500,35 +507,6 @@ fun PersonDetailView(
                         )
                     }
                 }
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // Long Report Person Button below the two buttons (Movies & TV Shows)
-            OutlinedButton(
-                onClick = onReport,
-                shape = RoundedCornerShape(8.dp),
-                colors = ButtonDefaults.outlinedButtonColors(
-                    contentColor = Color.White.copy(alpha = 0.8f)
-                ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(44.dp)
-                    .testTag("detail_report_person_btn")
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Flag,
-                    contentDescription = null,
-                    tint = NetflixRed,
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "Report Person",
-                    color = Color.White,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium
-                )
             }
 
             Spacer(modifier = Modifier.height(14.dp))

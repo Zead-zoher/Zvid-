@@ -69,6 +69,17 @@ object ContentFilter {
     private val _derivedBlockedTvIds = MutableStateFlow<Set<Int>>(emptySet())
     val derivedBlockedTvIds: StateFlow<Set<Int>> = _derivedBlockedTvIds.asStateFlow()
 
+    // Dynamically resolved keyword words/names extracted using user's key
+    private val _extractedKeywordNames = MutableStateFlow<Set<String>>(emptySet())
+    val extractedKeywordNames: StateFlow<Set<String>> = _extractedKeywordNames.asStateFlow()
+
+    // Map of normalized keyword names to their TMDB keyword IDs for instant query checking
+    private val _keywordNameToIdMap = java.util.concurrent.ConcurrentHashMap<String, Int>()
+
+    // Flag indicating whether keyword resolution and extraction has completed
+    private val _isKeywordsResolved = MutableStateFlow(false)
+    val isKeywordsResolved: StateFlow<Boolean> = _isKeywordsResolved.asStateFlow()
+
     // Regex matching sexual / hentai / erotic / sex terms.
     private val SEXUAL_WORD_REGEX = Regex(
         """(?i)(^|[^a-zA-Z0-9])(sex|sexy|sexual|sexuality|hentai|xxx|porn|porno|pornography|erotic|erotica|ecchi|softcore|hardcore|nudity|nude)($|[^a-zA-Z0-9])"""
@@ -77,6 +88,31 @@ object ContentFilter {
     private val ARABIC_SEXUAL_REGEX = Regex(
         """(سكس|إباحي|اباحي|إباحية|اباحية|بورنو|هينتاي|جنسي|جنسيه|جنسية|مثير|شذوذ|لواط|عري|عاري)"""
     )
+
+    fun registerResolvedKeyword(keywordId: Int, keywordName: String) {
+        val trimmed = keywordName.trim()
+        if (trimmed.isNotBlank()) {
+            val current = _extractedKeywordNames.value.toMutableSet()
+            current.add(trimmed)
+            _extractedKeywordNames.value = current
+
+            val norm = trimmed.lowercase()
+            _keywordNameToIdMap[norm] = keywordId
+            if (ArabicSearchHelper.isArabic(trimmed)) {
+                _keywordNameToIdMap[normalizeArabic(trimmed).lowercase()] = keywordId
+            }
+        }
+    }
+
+    fun markKeywordsResolved() {
+        _isKeywordsResolved.value = true
+    }
+
+    fun resetResolvedKeywords() {
+        _extractedKeywordNames.value = emptySet()
+        _keywordNameToIdMap.clear()
+        _isKeywordsResolved.value = false
+    }
 
     fun updateBlocklist(remoteBlocklist: Blocklist) {
         _blocklist.value = Blocklist(
@@ -176,13 +212,15 @@ object ContentFilter {
 
     fun matchesBlockedText(vararg texts: String?): Boolean {
         val customWords = _blocklist.value.words
+        val extractedKeywords = _extractedKeywordNames.value
+        val allWordsToCheck = customWords + extractedKeywords
         for (text in texts) {
             if (!text.isNullOrBlank()) {
                 val trimmed = text.trim()
                 if (SEXUAL_WORD_REGEX.containsMatchIn(trimmed) || ARABIC_SEXUAL_REGEX.containsMatchIn(trimmed)) {
                     return true
                 }
-                for (w in customWords) {
+                for (w in allWordsToCheck) {
                     if (w.isNotBlank() && containsBlockedWord(trimmed, w)) {
                         return true
                     }
@@ -195,16 +233,37 @@ object ContentFilter {
     // Keep alias for backwards compatibility
     fun matchesSexualText(vararg texts: String?): Boolean = matchesBlockedText(*texts)
 
+    /**
+     * Checks if search query matches a blocked keyword or keyword key.
+     * Blocks search if the search key/query matches a blocked keyword.
+     */
     fun isBlockedSearchQuery(query: String): Boolean {
         if (query.isBlank()) return false
         val trimmed = query.trim()
-        if (matchesBlockedText(trimmed)) return true
-        val customWords = _blocklist.value.words
-        for (w in customWords) {
-            if (w.isNotBlank() && containsBlockedWord(trimmed, w)) {
+
+        // 1. Check direct keyword ID lookup or cached keyword names
+        val lower = trimmed.lowercase()
+        val mappedId = _keywordNameToIdMap[lower]
+        if (mappedId != null && isBlockedKeywordId(mappedId)) {
+            return true
+        }
+
+        val normArabic = normalizeArabic(trimmed).lowercase()
+        val mappedArabicId = _keywordNameToIdMap[normArabic]
+        if (mappedArabicId != null && isBlockedKeywordId(mappedArabicId)) {
+            return true
+        }
+
+        // 2. Check if the query matches any extracted keyword name
+        for (kwName in _extractedKeywordNames.value) {
+            if (kwName.isNotBlank() && containsBlockedWord(trimmed, kwName)) {
                 return true
             }
         }
+
+        // 3. Fallback text matches
+        if (matchesBlockedText(trimmed)) return true
+
         return false
     }
 

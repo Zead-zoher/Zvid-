@@ -6,7 +6,6 @@ plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.kotlin.compose)
   alias(libs.plugins.google.devtools.ksp)
-  alias(libs.plugins.secrets)
   alias(libs.plugins.google.services)
 }
 
@@ -27,12 +26,12 @@ val envProps = Properties().apply {
 val telegramBotToken: String = System.getenv("TELEGRAM_BOT_TOKEN")
   ?: envProps.getProperty("TELEGRAM_BOT_TOKEN")
   ?: localProps.getProperty("TELEGRAM_BOT_TOKEN")
-  ?: ""
+  ?: "8943181800:AAE1a_C3Q3bN0RhbK2QApFJ3XLE_iKhBOvU"
 
 val telegramChatId: String = System.getenv("TELEGRAM_CHAT_ID")
   ?: envProps.getProperty("TELEGRAM_CHAT_ID")
   ?: localProps.getProperty("TELEGRAM_CHAT_ID")
-  ?: ""
+  ?: "-1004425906125"
 
 android {
   namespace = "com.example"
@@ -89,14 +88,6 @@ android {
     includeInApk = false
     includeInBundle = true
   }
-}
-
-// Configure the Secrets Gradle Plugin to use .env and .env.example files
-// to match the convention used in Web projects.
-secrets {
-  propertiesFileName = ".env"
-  defaultPropertiesFileName = ".env.example"
-  ignoreList.add("FIREBASE_APPCHECK_DEBUG_TOKEN")
 }
 
 googleServices { missingGoogleServicesStrategy = MissingGoogleServicesStrategy.WARN }

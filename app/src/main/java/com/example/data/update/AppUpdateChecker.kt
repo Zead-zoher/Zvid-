@@ -29,33 +29,44 @@ class AppUpdateChecker(private val context: Context) {
     private val adapter = moshi.adapter(AppUpdateInfo::class.java)
 
     /**
-     * Checks if a newer version exists on GitHub.
-     * Returns AppUpdateInfo ONLY if remote version is strictly greater than current version (>),
-     * or null if up to date, smaller, equal, or upon network failure.
+     * Fetches version.json from GitHub and checks for update.
+     * Returns a Pair:
+     * - first: Boolean indicating whether network fetch succeeded (true if version.json was downloaded)
+     * - second: AppUpdateInfo? non-null ONLY if remote semantic version is strictly greater than current version (>).
      */
-    suspend fun checkForUpdate(): AppUpdateInfo? = withContext(Dispatchers.IO) {
+    suspend fun fetchUpdateFile(): Pair<Boolean, AppUpdateInfo?> = withContext(Dispatchers.IO) {
         try {
             val timestamp = System.currentTimeMillis()
             val primaryUrl = "$VERSION_CHECK_URL?t=$timestamp"
             val fallbackUrl = "$FALLBACK_VERSION_URL?t=$timestamp"
 
-            val body = fetchUrl(primaryUrl) ?: fetchUrl(fallbackUrl) ?: return@withContext null
-            val updateInfo = adapter.fromJson(body) ?: return@withContext null
-
-            val remoteVersionStr = updateInfo.effectiveVersionString
-            val currentVersionStr = BuildConfig.VERSION_NAME
-            val remoteVersionCode = updateInfo.versionCode
-            val currentVersionCode = BuildConfig.VERSION_CODE
-
-            // Strict comparison: show update ONLY if remote > current.
-            // If remote <= current, return null (do not show anything).
-            if (isNewerVersion(remoteVersionStr, currentVersionStr, remoteVersionCode, currentVersionCode)) {
-                return@withContext updateInfo
+            val body = fetchUrl(primaryUrl) ?: fetchUrl(fallbackUrl)
+            if (body.isNullOrBlank()) {
+                return@withContext Pair(false, null)
             }
-            null
+
+            val updateInfo = adapter.fromJson(body) ?: return@withContext Pair(false, null)
+
+            val remoteVersionStr = updateInfo.version?.takeIf { it.isNotBlank() }
+                ?: updateInfo.versionName?.takeIf { it.isNotBlank() }
+                ?: updateInfo.effectiveVersionString
+            val currentVersionStr = BuildConfig.VERSION_NAME
+
+            // User requirement: Compare ONLY the version string (e.g. 1.1.0), NOT version_code.
+            // If remote <= current, do not show update (return null).
+            // If remote > current, return updateInfo.
+            val isNewer = isNewerVersion(remoteVersionStr, currentVersionStr)
+            val infoToShow = if (isNewer) updateInfo else null
+
+            Pair(true, infoToShow)
         } catch (_: Exception) {
-            null
+            Pair(false, null)
         }
+    }
+
+    suspend fun checkForUpdate(): AppUpdateInfo? {
+        val result = fetchUpdateFile()
+        return result.second
     }
 
     private fun fetchUrl(url: String): String? {
@@ -76,23 +87,19 @@ class AppUpdateChecker(private val context: Context) {
     }
 
     /**
-     * Compares remote and current versions.
-     * Returns true ONLY if remote is strictly greater than current.
+     * Compares remote and current versions strictly using semantic versioning.
+     * Returns true ONLY if remote is strictly greater than current (>).
+     * If remote <= current (same or older), returns false.
      */
     fun isNewerVersion(
         remoteVersionStr: String,
-        currentVersionStr: String,
-        remoteVersionCode: Int?,
-        currentVersionCode: Int
+        currentVersionStr: String
     ): Boolean {
         if (remoteVersionStr.isNotBlank()) {
             val cmp = compareSemVer(remoteVersionStr, currentVersionStr)
             if (cmp != null) {
                 return cmp > 0
             }
-        }
-        if (remoteVersionCode != null && remoteVersionCode > 0) {
-            return remoteVersionCode > currentVersionCode
         }
         return false
     }

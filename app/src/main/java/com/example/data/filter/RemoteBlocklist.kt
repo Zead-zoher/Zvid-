@@ -24,11 +24,12 @@ class RemoteBlocklist(private val context: Context) {
         .readTimeout(15, TimeUnit.SECONDS)
         .build()
 
-    suspend fun initialize() = withContext(Dispatchers.IO) {
+    suspend fun initialize(): Boolean = withContext(Dispatchers.IO) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val now = System.currentTimeMillis()
 
         var parsedBlocklist: Blocklist? = null
+        var isRemoteSuccess = false
 
         // 1. Fresh download from GitHub repository with cache busting on every app launch
         val timestamp = System.currentTimeMillis()
@@ -41,6 +42,7 @@ class RemoteBlocklist(private val context: Context) {
                 saveToDiskCache(remoteJson)
                 prefs.edit().putLong(KEY_LAST_FETCH, now).apply()
                 parsedBlocklist = parsed
+                isRemoteSuccess = true
             }
         }
 
@@ -63,6 +65,7 @@ class RemoteBlocklist(private val context: Context) {
         // 4. Update ContentFilter with final blocklist
         val finalBlocklist = parsedBlocklist ?: Blocklist()
         ContentFilter.updateBlocklist(finalBlocklist)
+        isRemoteSuccess
     }
 
     private fun downloadRemoteJson(url: String): String? {
