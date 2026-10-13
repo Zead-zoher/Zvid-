@@ -220,7 +220,7 @@ fun PhoneRemoteControlScreen(
                         Button(
                             onClick = {
                                 clipboardManager.setText(AnnotatedString(serverUrl))
-                                copiedNotice = "Server URL copied!"
+                                android.widget.Toast.makeText(context, "تم نسخ رابط السيرفر", android.widget.Toast.LENGTH_SHORT).show()
                             },
                             shape = RoundedCornerShape(8.dp),
                             colors = ButtonDefaults.buttonColors(

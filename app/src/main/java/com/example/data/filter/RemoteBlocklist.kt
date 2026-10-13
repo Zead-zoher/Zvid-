@@ -13,66 +13,65 @@ class RemoteBlocklist(private val context: Context) {
 
     companion object {
         const val BLOCKLIST_URL = "https://raw.githubusercontent.com/Zead-zoher/Zvid-/main/blocklist.json"
-        const val FALLBACK_BLOCKLIST_URL = "https://github.com/Zead-zoher/Zvid-/raw/main/blocklist.json"
-        private const val PREFS_NAME = "remote_blocklist_prefs"
-        private const val KEY_LAST_FETCH = "last_blocklist_fetch_ms"
-        private const val CACHE_FILE_NAME = "cached_blocklist.json"
+        const val CDN_BLOCKLIST_URL = "https://cdn.jsdelivr.net/gh/Zead-zoher/Zvid-@main/blocklist.json"
+        const val GITHUB_RAW_URL = "https://github.com/Zead-zoher/Zvid-/raw/main/blocklist.json"
+        const val GITHUB_BLOB_RAW_URL = "https://github.com/Zead-zoher/Zvid-/blob/main/blocklist.json?raw=true"
     }
 
     private val httpClient = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(15, TimeUnit.SECONDS)
+        .followRedirects(true)
+        .followSslRedirects(true)
         .build()
 
+    /**
+     * Downloads the blocklist live from remote sources on every startup / refresh.
+     * No blocklist is stored inside the app files or internal disk cache.
+     */
     suspend fun initialize(): Boolean = withContext(Dispatchers.IO) {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val now = System.currentTimeMillis()
+        // Clean up any old cached file so no blocklist exists locally in app storage
+        try {
+            val oldCache = File(context.filesDir, "cached_blocklist.json")
+            if (oldCache.exists()) {
+                oldCache.delete()
+            }
+        } catch (_: Exception) {}
 
         var parsedBlocklist: Blocklist? = null
-        var isRemoteSuccess = false
 
-        // 1. Fresh download from GitHub repository with cache busting on every app launch
         val timestamp = System.currentTimeMillis()
-        val primaryUrl = "$BLOCKLIST_URL?t=$timestamp"
-        val fallbackUrl = "$FALLBACK_BLOCKLIST_URL?t=$timestamp"
-        val remoteJson = downloadRemoteJson(primaryUrl) ?: downloadRemoteJson(fallbackUrl)
-        if (!remoteJson.isNullOrBlank()) {
-            val parsed = parseJson(remoteJson)
-            if (parsed != null) {
-                saveToDiskCache(remoteJson)
-                prefs.edit().putLong(KEY_LAST_FETCH, now).apply()
-                parsedBlocklist = parsed
-                isRemoteSuccess = true
+        val urls = listOf(
+            "$BLOCKLIST_URL?t=$timestamp",
+            "$CDN_BLOCKLIST_URL?t=$timestamp",
+            "$GITHUB_RAW_URL?t=$timestamp",
+            "$GITHUB_BLOB_RAW_URL&t=$timestamp"
+        )
+
+        for (url in urls) {
+            val remoteJson = downloadRemoteJson(url)
+            if (!remoteJson.isNullOrBlank()) {
+                val parsed = parseJson(remoteJson)
+                if (parsed != null) {
+                    parsedBlocklist = parsed
+                    break
+                }
             }
         }
 
-        // 2. If remote download failed (e.g. offline), try disk cache
-        if (parsedBlocklist == null) {
-            val cachedJson = loadFromDiskCache()
-            if (!cachedJson.isNullOrBlank()) {
-                parsedBlocklist = parseJson(cachedJson)
-            }
+        if (parsedBlocklist != null) {
+            ContentFilter.updateBlocklist(parsedBlocklist)
+            true
+        } else {
+            false
         }
-
-        // 3. If disk cache absent or invalid, try bundled assets
-        if (parsedBlocklist == null) {
-            val assetJson = loadFromAssets()
-            if (!assetJson.isNullOrBlank()) {
-                parsedBlocklist = parseJson(assetJson)
-            }
-        }
-
-        // 4. Update ContentFilter with final blocklist
-        val finalBlocklist = parsedBlocklist ?: Blocklist()
-        ContentFilter.updateBlocklist(finalBlocklist)
-        isRemoteSuccess
     }
 
     private fun downloadRemoteJson(url: String): String? {
         return try {
             val request = Request.Builder()
                 .url(url)
-                .header("Accept", "application/json")
+                .header("Accept", "*/*")
                 .header("Cache-Control", "no-cache, no-store, must-revalidate")
                 .header("Pragma", "no-cache")
                 .build()
@@ -84,32 +83,6 @@ class RemoteBlocklist(private val context: Context) {
                     null
                 }
             }
-        } catch (_: Exception) {
-            null
-        }
-    }
-
-    private fun saveToDiskCache(json: String) {
-        try {
-            val file = File(context.filesDir, CACHE_FILE_NAME)
-            file.writeText(json)
-        } catch (_: Exception) {}
-    }
-
-    private fun loadFromDiskCache(): String? {
-        return try {
-            val file = File(context.filesDir, CACHE_FILE_NAME)
-            if (file.exists() && file.isFile) {
-                file.readText()
-            } else null
-        } catch (_: Exception) {
-            null
-        }
-    }
-
-    private fun loadFromAssets(): String? {
-        return try {
-            context.assets.open("blocklist.json").bufferedReader().use { it.readText() }
         } catch (_: Exception) {
             null
         }

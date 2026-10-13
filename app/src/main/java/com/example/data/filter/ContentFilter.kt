@@ -50,14 +50,7 @@ object ContentFilter {
         "جنسي", "جنسيه", "جنسية"
     )
 
-    private val initialBlocklist = Blocklist(
-        movies = BUILT_IN_MOVIES,
-        tv = BUILT_IN_TV,
-        companies = BUILT_IN_COMPANIES,
-        people = BUILT_IN_PEOPLE,
-        keywords = BUILT_IN_KEYWORDS,
-        words = BUILT_IN_WORDS
-    )
+    private val initialBlocklist = Blocklist()
 
     private val _blocklist = MutableStateFlow(initialBlocklist)
     val blocklist: StateFlow<Blocklist> = _blocklist.asStateFlow()
@@ -115,14 +108,7 @@ object ContentFilter {
     }
 
     fun updateBlocklist(remoteBlocklist: Blocklist) {
-        _blocklist.value = Blocklist(
-            movies = BUILT_IN_MOVIES + remoteBlocklist.movies,
-            tv = BUILT_IN_TV + remoteBlocklist.tv,
-            companies = BUILT_IN_COMPANIES + remoteBlocklist.companies,
-            people = BUILT_IN_PEOPLE + remoteBlocklist.people,
-            keywords = BUILT_IN_KEYWORDS + remoteBlocklist.keywords,
-            words = BUILT_IN_WORDS + remoteBlocklist.words
-        )
+        _blocklist.value = remoteBlocklist
     }
 
     fun getAllBlockedPeopleIds(): Set<Int> {
@@ -134,10 +120,7 @@ object ContentFilter {
     }
 
     fun getAllBlockedKeywordIds(): Set<Int> {
-        val defaultKeywordList = BLOCKED_KEYWORD_IDS.split(",")
-            .mapNotNull { it.trim().toIntOrNull() }
-            .toSet()
-        return defaultKeywordList + _blocklist.value.keywords
+        return _blocklist.value.keywords
     }
 
     fun getAllBlockedWords(): Set<String> {

@@ -1602,7 +1602,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 voteAverage = movie.voteAverage,
                 releaseDate = movie.releaseDate
             )
-            _userMessage.emit(if (saved) "Added to Watchlist" else "Removed from Watchlist")
+            _userMessage.emit(if (saved) "تمت الإضافة إلى قائمتي" else "تمت الإزالة من قائمتي")
         }
     }
 
@@ -1618,7 +1618,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 voteAverage = movie.voteAverage,
                 releaseDate = movie.releaseDate
             )
-            _userMessage.emit(if (saved) "Added to Watchlist" else "Removed from Watchlist")
+            _userMessage.emit(if (saved) "تمت الإضافة إلى قائمتي" else "تمت الإزالة من قائمتي")
         }
     }
 
@@ -1634,7 +1634,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 voteAverage = tv.voteAverage,
                 releaseDate = tv.firstAirDate
             )
-            _userMessage.emit(if (saved) "Added to Watchlist" else "Removed from Watchlist")
+            _userMessage.emit(if (saved) "تمت الإضافة إلى قائمتي" else "تمت الإزالة من قائمتي")
         }
     }
 
@@ -1650,14 +1650,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 voteAverage = tv.voteAverage,
                 releaseDate = tv.firstAirDate
             )
-            _userMessage.emit(if (saved) "Added to Watchlist" else "Removed from Watchlist")
+            _userMessage.emit(if (saved) "تمت الإضافة إلى قائمتي" else "تمت الإزالة من قائمتي")
         }
     }
 
     fun removeFromWatchlist(id: Int) {
         viewModelScope.launch {
             repository.removeFromWatchlist(id)
-            _userMessage.emit("Removed from Watchlist")
+            _userMessage.emit("تمت الإزالة من قائمتي")
         }
     }
 
@@ -1665,14 +1665,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun deleteHistoryItem(historyId: String) {
         viewModelScope.launch {
             repository.deleteHistoryItem(historyId)
-            _userMessage.emit("Removed from History")
+            _userMessage.emit("تمت الإزالة من السجل")
         }
     }
 
     fun clearAllHistory() {
         viewModelScope.launch {
             repository.clearAllHistory()
-            _userMessage.emit("Watch history cleared")
+            _userMessage.emit("تم مسح سجل المشاهدة")
         }
     }
 }

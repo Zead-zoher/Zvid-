@@ -17,9 +17,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import android.widget.Toast
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
@@ -182,6 +182,24 @@ fun MainAppContent(viewModel: MainViewModel) {
     val savedPersonIds by viewModel.savedPersonIds.collectAsStateWithLifecycle()
     val savedPeople by viewModel.savedPeopleList.collectAsStateWithLifecycle()
     val availableUpdate by viewModel.availableUpdate.collectAsStateWithLifecycle()
+
+    val context = LocalContext.current
+
+    LaunchedEffect(Unit) {
+        viewModel.userMessage.collect { msg ->
+            if (msg.isNotBlank()) {
+                Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        reportViewModel.snackbarEvent.collect { msg ->
+            if (msg.isNotBlank()) {
+                Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
 
     // Smart BackHandler navigation: return to suggestions / close search / dismiss modals before exiting
     val isMovieSearching = currentTab == AppTab.MOVIES && (isMovieSearchSubmitted || movieSearchQuery.isNotEmpty())

@@ -13,13 +13,24 @@ import java.util.concurrent.TimeUnit
 class AppUpdateChecker(private val context: Context) {
 
     companion object {
+        /**
+         * CURRENT_APP_VERSION:
+         * مكان الإصدار الحالي في الكود (1.1.0) لمقارنته مع ملف version.json الخارجي.
+         * قم بتعديل هذا المتغير عند إطلاق أي إصدار جديد.
+         */
+        const val CURRENT_APP_VERSION = "1.1.0"
+
         const val VERSION_CHECK_URL = "https://raw.githubusercontent.com/Zead-zoher/Zvid-/main/version.json"
-        const val FALLBACK_VERSION_URL = "https://github.com/Zead-zoher/Zvid-/raw/main/version.json"
+        const val CDN_VERSION_URL = "https://cdn.jsdelivr.net/gh/Zead-zoher/Zvid-@main/version.json"
+        const val GITHUB_RAW_URL = "https://github.com/Zead-zoher/Zvid-/raw/main/version.json"
+        const val GITHUB_BLOB_RAW_URL = "https://github.com/Zead-zoher/Zvid-/blob/main/version.json?raw=true"
     }
 
     private val httpClient = OkHttpClient.Builder()
-        .connectTimeout(10, TimeUnit.SECONDS)
-        .readTimeout(10, TimeUnit.SECONDS)
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(15, TimeUnit.SECONDS)
+        .followRedirects(true)
+        .followSslRedirects(true)
         .build()
 
     private val moshi = Moshi.Builder()
@@ -29,32 +40,45 @@ class AppUpdateChecker(private val context: Context) {
     private val adapter = moshi.adapter(AppUpdateInfo::class.java)
 
     /**
-     * Fetches version.json from GitHub and checks for update.
+     * Fetches version.json live from remote sources on every startup / check.
+     * No version.json file is stored locally in the app files.
      * Returns a Pair:
-     * - first: Boolean indicating whether network fetch succeeded (true if version.json was downloaded)
-     * - second: AppUpdateInfo? non-null ONLY if remote semantic version is strictly greater than current version (>).
+     * - first: Boolean indicating whether network fetch succeeded
+     * - second: AppUpdateInfo? non-null ONLY if remote semantic version is strictly greater than CURRENT_APP_VERSION (1.1.0).
      */
     suspend fun fetchUpdateFile(): Pair<Boolean, AppUpdateInfo?> = withContext(Dispatchers.IO) {
         try {
             val timestamp = System.currentTimeMillis()
-            val primaryUrl = "$VERSION_CHECK_URL?t=$timestamp"
-            val fallbackUrl = "$FALLBACK_VERSION_URL?t=$timestamp"
+            val urls = listOf(
+                "$VERSION_CHECK_URL?t=$timestamp",
+                "$CDN_VERSION_URL?t=$timestamp",
+                "$GITHUB_RAW_URL?t=$timestamp",
+                "$GITHUB_BLOB_RAW_URL&t=$timestamp"
+            )
 
-            val body = fetchUrl(primaryUrl) ?: fetchUrl(fallbackUrl)
-            if (body.isNullOrBlank()) {
+            var downloadedBody: String? = null
+            for (url in urls) {
+                val body = fetchUrl(url)
+                if (!body.isNullOrBlank()) {
+                    downloadedBody = body
+                    break
+                }
+            }
+
+            if (downloadedBody.isNullOrBlank()) {
                 return@withContext Pair(false, null)
             }
 
-            val updateInfo = adapter.fromJson(body) ?: return@withContext Pair(false, null)
+            val updateInfo = adapter.fromJson(downloadedBody) ?: return@withContext Pair(false, null)
 
             val remoteVersionStr = updateInfo.version?.takeIf { it.isNotBlank() }
                 ?: updateInfo.versionName?.takeIf { it.isNotBlank() }
                 ?: updateInfo.effectiveVersionString
-            val currentVersionStr = BuildConfig.VERSION_NAME
+            val currentVersionStr = CURRENT_APP_VERSION
 
-            // User requirement: Compare ONLY the version string (e.g. 1.1.0), NOT version_code.
-            // If remote <= current, do not show update (return null).
-            // If remote > current, return updateInfo.
+            // Compare ONLY the version string (e.g. 1.1.0), NOT version_code.
+            // If remote <= current (e.g. remote is "1.1.0" and current is "1.1.0"), do not show update.
+            // If remote > current (e.g. remote is "1.1.1"), return updateInfo.
             val isNewer = isNewerVersion(remoteVersionStr, currentVersionStr)
             val infoToShow = if (isNewer) updateInfo else null
 
@@ -73,7 +97,7 @@ class AppUpdateChecker(private val context: Context) {
         return try {
             val request = Request.Builder()
                 .url(url)
-                .header("Accept", "application/json")
+                .header("Accept", "*/*")
                 .header("Cache-Control", "no-cache, no-store, must-revalidate")
                 .header("Pragma", "no-cache")
                 .build()

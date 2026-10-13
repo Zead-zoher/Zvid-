@@ -15,6 +15,7 @@ object WebVideoCasterHelper {
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
         val clip = ClipData.newPlainText(label, url)
         clipboard?.setPrimaryClip(clip)
+        android.widget.Toast.makeText(context, "تم نسخ الرابط", android.widget.Toast.LENGTH_SHORT).show()
     }
 
     /**
