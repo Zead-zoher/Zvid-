@@ -3,7 +3,6 @@ package com.example.player
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.widget.Toast
 
 data class StreamEmbedProvider(
     val id: String,
@@ -98,7 +97,6 @@ object ProviderManager {
 
         try {
             context.startActivity(wvcIntent)
-            Toast.makeText(context, "Opening in Web Video Caster...", Toast.LENGTH_SHORT).show()
         } catch (_: Exception) {
             // Fallback to system browser
             try {
@@ -106,9 +104,7 @@ object ProviderManager {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
                 context.startActivity(browserIntent)
-                Toast.makeText(context, "Opening stream in browser...", Toast.LENGTH_SHORT).show()
-            } catch (e: Exception) {
-                Toast.makeText(context, "Unable to open link: ${e.message}", Toast.LENGTH_SHORT).show()
+            } catch (_: Exception) {
             }
         }
     }

@@ -17,13 +17,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Snackbar
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
@@ -36,11 +32,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupProperties
 import androidx.compose.ui.zIndex
 import kotlinx.coroutines.delay
-import android.widget.Toast
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.data.report.ReportTargetType
@@ -247,37 +240,6 @@ fun MainAppContent(viewModel: MainViewModel) {
             isSubTabActive -> {
                 viewModel.setTab(AppTab.MOVIES)
             }
-        }
-    }
-
-    val snackbarHostState = remember { SnackbarHostState() }
-    val context = LocalContext.current
-    var topToastMessage by remember { androidx.compose.runtime.mutableStateOf<String?>(null) }
-
-    LaunchedEffect(Unit) {
-        viewModel.userMessage.collectLatest { msg ->
-            topToastMessage = msg
-            try {
-                Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
-            } catch (_: Exception) {}
-            snackbarHostState.showSnackbar(msg)
-        }
-    }
-
-    LaunchedEffect(Unit) {
-        reportViewModel.snackbarEvent.collectLatest { msg ->
-            topToastMessage = msg
-            try {
-                Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
-            } catch (_: Exception) {}
-            snackbarHostState.showSnackbar(msg)
-        }
-    }
-
-    LaunchedEffect(topToastMessage) {
-        if (topToastMessage != null) {
-            delay(3200)
-            topToastMessage = null
         }
     }
 
@@ -535,6 +497,13 @@ fun MainAppContent(viewModel: MainViewModel) {
                 onToggleWatchlistTv = { tv -> viewModel.toggleWatchlistTv(tv) },
                 isPersonSaved = selectedPerson?.let { savedPersonIds.contains(it.id) } ?: false,
                 onToggleSavePerson = { selectedPerson?.let { viewModel.toggleSavePerson(it) } },
+                onReportPerson = { person ->
+                    reportViewModel.openReportDialog(
+                        type = ReportTargetType.Person,
+                        id = person.id,
+                        title = person.name
+                    )
+                },
                 onDismiss = { viewModel.closePeopleDialog() }
             )
         }
@@ -672,65 +641,5 @@ fun MainAppContent(viewModel: MainViewModel) {
             errorMessage = "No internet connected",
             onRetry = { viewModel.retryInitialization() }
         )
-
-        // Top-most Toast/Snackbar Layer (Always on top of all dialogs, modals, and overlays)
-        SnackbarHost(
-            hostState = snackbarHostState,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .navigationBarsPadding()
-                .padding(bottom = 20.dp, start = 16.dp, end = 16.dp)
-                .zIndex(99999f)
-        ) { data ->
-            Snackbar(
-                snackbarData = data,
-                containerColor = Color.White,
-                contentColor = Color.Black,
-                shape = RoundedCornerShape(12.dp)
-            )
-        }
-
-        // Dedicated Top-Layer Window Popup Toast (Never obscured by bottom sheets, dialogs, or video player)
-        if (topToastMessage != null) {
-            Popup(
-                alignment = Alignment.BottomCenter,
-                properties = PopupProperties(
-                    focusable = false,
-                    dismissOnBackPress = false,
-                    dismissOnClickOutside = false,
-                    clippingEnabled = false
-                )
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .navigationBarsPadding()
-                        .padding(bottom = 26.dp, start = 16.dp, end = 16.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = Color.White,
-                        shadowElevation = 16.dp,
-                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE0E0E0)),
-                        modifier = Modifier.wrapContentSize()
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center
-                        ) {
-                            Text(
-                                text = topToastMessage!!,
-                                color = Color.Black,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                textAlign = TextAlign.Center
-                            )
-                        }
-                    }
-                }
-            }
-        }
     }
 }

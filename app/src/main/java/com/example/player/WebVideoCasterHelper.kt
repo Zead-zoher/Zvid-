@@ -5,7 +5,6 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.widget.Toast
 
 object WebVideoCasterHelper {
 
@@ -16,7 +15,6 @@ object WebVideoCasterHelper {
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
         val clip = ClipData.newPlainText(label, url)
         clipboard?.setPrimaryClip(clip)
-        Toast.makeText(context, "Copied to clipboard!", Toast.LENGTH_SHORT).show()
     }
 
     /**
@@ -49,16 +47,13 @@ object WebVideoCasterHelper {
 
         try {
             context.startActivity(intent)
-            Toast.makeText(context, "Opening in Web Video Caster...", Toast.LENGTH_SHORT).show()
         } catch (_: Exception) {
             try {
                 val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(embedUrl)).apply {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
                 context.startActivity(browserIntent)
-                Toast.makeText(context, "Opening stream in browser...", Toast.LENGTH_SHORT).show()
-            } catch (e: Exception) {
-                Toast.makeText(context, "Copied stream URL to clipboard!", Toast.LENGTH_LONG).show()
+            } catch (_: Exception) {
             }
         }
     }

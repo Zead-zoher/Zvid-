@@ -1,5 +1,6 @@
 package com.example.ui.modals
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -14,7 +15,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.ui.zIndex
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -126,6 +129,7 @@ fun MediaDetailModal(
             modifier = Modifier
                 .fillMaxSize()
                 .background(NetflixBlack)
+                .statusBarsPadding()
                 .testTag("media_detail_modal")
         ) {
             if (isLoadingDetail) {
@@ -182,6 +186,26 @@ fun MediaDetailModal(
                     onClose = onDismiss
                 )
             }
+
+            // Top-right Close Button (Always floating below status bar)
+            IconButton(
+                onClick = onDismiss,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(14.dp)
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(Color.Black.copy(alpha = 0.7f))
+                    .zIndex(20f)
+                    .testTag("detail_close_btn")
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "Close",
+                    tint = Color.White,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
         }
     }
 }
@@ -235,25 +259,6 @@ fun MovieDetailContent(
                             )
                         )
                 )
-
-                // Action top-right (Close only)
-                IconButton(
-                    onClick = onClose,
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(16.dp)
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .background(Color.Black.copy(alpha = 0.6f))
-                        .testTag("detail_close_btn")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = "Close",
-                        tint = Color.White,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
             }
         }
 
@@ -377,6 +382,36 @@ fun MovieDetailContent(
                 }
 
                 Spacer(modifier = Modifier.height(10.dp))
+
+                // Report Movie Button
+                OutlinedButton(
+                    onClick = onReportClick,
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = NetflixRed.copy(alpha = 0.15f),
+                        contentColor = NetflixRed
+                    ),
+                    border = BorderStroke(1.dp, NetflixRed.copy(alpha = 0.6f)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(44.dp)
+                        .testTag("report_movie_btn")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Flag,
+                        contentDescription = "Report Movie",
+                        tint = NetflixRed,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Report",
+                        color = Color.White,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
                 Spacer(modifier = Modifier.height(14.dp))
 
                 // Genres tags
@@ -620,25 +655,6 @@ fun TvDetailContent(
                             )
                         )
                 )
-
-                // Action top-right (Close only)
-                IconButton(
-                    onClick = onClose,
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(16.dp)
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .background(Color.Black.copy(alpha = 0.6f))
-                        .testTag("detail_close_btn")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = "Close",
-                        tint = Color.White,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
             }
         }
 
@@ -719,6 +735,37 @@ fun TvDetailContent(
                         color = if (isSaved) NetflixRed else Color.White,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.SemiBold
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Report Series Button
+                OutlinedButton(
+                    onClick = onReportClick,
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = NetflixRed.copy(alpha = 0.15f),
+                        contentColor = NetflixRed
+                    ),
+                    border = BorderStroke(1.dp, NetflixRed.copy(alpha = 0.6f)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(44.dp)
+                        .testTag("report_tv_btn")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Flag,
+                        contentDescription = "Report Series",
+                        tint = NetflixRed,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Report",
+                        color = Color.White,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold
                     )
                 }
 

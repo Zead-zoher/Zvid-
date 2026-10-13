@@ -1,6 +1,7 @@
 package com.example.ui.modals
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -507,6 +508,37 @@ fun PersonDetailView(
                         )
                     }
                 }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Report Actor Button
+            OutlinedButton(
+                onClick = onReport,
+                shape = RoundedCornerShape(8.dp),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    containerColor = NetflixRed.copy(alpha = 0.15f),
+                    contentColor = NetflixRed
+                ),
+                border = BorderStroke(1.dp, NetflixRed.copy(alpha = 0.6f)),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(38.dp)
+                    .testTag("report_person_btn")
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Flag,
+                    contentDescription = "Report Actor",
+                    tint = NetflixRed,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Report",
+                    color = Color.White,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold
+                )
             }
 
             Spacer(modifier = Modifier.height(14.dp))
