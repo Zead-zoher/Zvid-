@@ -4,7 +4,7 @@
 
 **Zvid** is a feature-rich, modern Android media streaming and exploration application built with **Kotlin** and **Jetpack Compose**. It leverages the TMDB API to provide seamless browsing of movies, TV series, actor filmographies, production studio catalogs, and embedded streaming playback, with a built-in always-on filter that keeps pornographic content out of the app in both **Arabic and English**.
 
-📥 **[Download Zvid_v1.1.0.apk](https://github.com/Zead-zoher/Zvid-/releases/download/v1.0.0/Zvid_v1.1.0.apk)**
+📥 **[Download Zvid_v1.1.0.apk](https://github.com/Zead-zoher/Zvid-/releases/download/v1.1.0/Zvid_v1.1.0.apk)**
 
 ---
 
