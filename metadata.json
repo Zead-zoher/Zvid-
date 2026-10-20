@@ -1,6 +1,0 @@
-{
-  "name": "Zvid",
-  "description": "An elegant, ad-free Android app for exploring movies and TV shows using TMDB with direct high-quality streaming support.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}
